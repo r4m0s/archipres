@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generador de Presupuestos BIM/BC3</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body class="bg-gray-100 h-screen flex flex-col font-sans">
+
+    <input type="file" id="file-ifc" accept=".ifc" style="display: none;">
+    <input type="file" id="file-bc3" accept=".bc3" style="display: none;">
+
+    <header class="bg-blue-900 text-white p-4 flex justify-between items-center shadow-md">
+        <h1 class="text-xl font-bold">App Presupuestos de Edificación</h1>
+        <div class="space-x-2">
+            <button id="btn-ifc" class="bg-blue-700 hover:bg-blue-600 px-4 py-2 rounded text-sm transition">1. Importar .IFC</button>
+            <button id="btn-bc3-import" class="bg-green-600 hover:bg-green-500 px-4 py-2 rounded text-sm transition font-bold">2. Importar .BC3</button>
+            <button id="btn-bc3-export" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded text-sm transition">3. Exportar .BC3</button>
+            <button id="btn-save" class="bg-indigo-600 hover:bg-indigo-500 px-4 py-2 rounded text-sm transition font-bold">4. Guardar Proyecto</button>
+        </div>
+    </header>
+
+    <main class="flex-1 flex flex-col lg:flex-row p-4 gap-4 overflow-hidden">
+        
+        <section class="flex-1 bg-white rounded-lg shadow-md border border-gray-200 flex flex-col">
+            <div class="p-3 bg-gray-50 border-b font-semibold text-gray-700 flex justify-between items-center">
+                <span>Visor del Modelo (.ifc)</span>
+                <span id="ifc-status" class="text-xs text-blue-600 font-normal">Sin modelo</span>
+            </div>
+            <div id="viewer-container" class="flex-1 w-full h-full relative cursor-crosshair"></div>
+        </section>
+
+        <section class="w-full lg:w-1/3 flex flex-col gap-4 overflow-y-auto">
+            
+            <div class="bg-white rounded-lg shadow-md border border-gray-200 p-4 min-h-[250px]">
+                <h2 class="font-semibold text-gray-700 mb-2">Dashboard de Costes</h2>
+                <div class="relative h-48 w-full flex justify-center items-center">
+                    <canvas id="costChart"></canvas>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-md border border-gray-200 p-4">
+                <h2 class="font-semibold text-gray-700 mb-2">Añadir Partida Manual</h2>
+                <div class="flex gap-2 text-sm">
+                    <input type="text" id="input-cap" placeholder="Capítulo" class="border p-2 rounded w-1/3">
+                    <input type="number" id="input-imp" placeholder="Importe (€)" class="border p-2 rounded w-1/3">
+                    <button id="btn-add" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 w-1/3">Añadir</button>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-md border border-gray-200 p-4 flex-1">
+                <div class="flex justify-between items-center mb-2">
+                    <h2 class="font-semibold text-gray-700">Desglose</h2>
+                    <span id="total-presupuesto" class="font-bold text-blue-700">Total: 0 €</span>
+                </div>
+                <table class="w-full text-sm text-left text-gray-500">
+                    <thead class="text-xs text-gray-700 uppercase bg-gray-50">
+                        <tr>
+                            <th class="px-2 py-2">Capítulo</th>
+                            <th class="px-2 py-2">Importe</th>
+                            <th class="px-2 py-2 text-right">X</th>
+                        </tr>
+                    </thead>
+                    <tbody id="table-body"></tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        // Envolvemos todo en un evento que asegura que el HTML cargó primero
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log("Sistema iniciado correctamente.");
+
+            // 1. CARGA SEGURA DEL ESTADO
+            let partidas = [];
+            try {
+                const guardado = localStorage.getItem('presupuesto_app_v2');
+                if (guardado) partidas = JSON.parse(guardado);
+            } catch (error) {
+                console.warn("Navegador bloquea localStorage (posible modo incógnito o políticas de seguridad).", error);
+            }
+
+            // 2. INICIALIZACIÓN DEL GRÁFICO (CHART.JS)
+            const ctx = document.getElementById('costChart').getContext('2d');
+            let costChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: { labels: [], datasets: [{ data: [], backgroundColor: ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#6366f1'], borderWidth: 0 }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right' } } }
+            });
+
+            // 3. FUNCIÓN DE RENDERIZADO VISUAL
+            function renderUI() {
+                const tbody = document.getElementById('table-body');
+                tbody.innerHTML = '';
+                let total = 0;
+                const agruparCapitulos = {};
+
+                partidas.forEach((partida, index) => {
+                    total += parseFloat(partida.importe);
+                    agruparCapitulos[partida.capitulo] = (agruparCapitulos[partida.capitulo] || 0) + parseFloat(partida.importe);
+
+                    const tr = document.createElement('tr');
+                    tr.className = "bg-white border-b hover:bg-gray-50";
+                    tr.innerHTML = `
+                        <td class="px-2 py-2 font-medium">${partida.capitulo}</td>
+                        <td class="px-2 py-2 text-blue-600 font-bold">${partida.importe.toFixed(2)} €</td>
+                        <td class="px-2 py-2 text-right">
+                            <button class="btn-borrar text-red-500 font-bold" data-index="${index}">X</button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+
+                document.getElementById('total-presupuesto').innerText = `Total: ${total.toFixed(2)} €`;
+
+                costChart.data.labels = Object.keys(agruparCapitulos);
+                costChart.data.datasets[0].data = Object.values(agruparCapitulos);
+                costChart.update();
+
+                // Reasignar eventos de borrado de forma segura
+                document.querySelectorAll('.btn-borrar').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const idx = e.target.getAttribute('data-index');
+                        partidas.splice(idx, 1);
+                        renderUI();
+                    });
+                });
+            }
+
+            // 4. PARSER BC3 SIMPLIFICADO Y ROBUSTO
+            function procesarFicheroBC3(contenidoTexto) {
+                const lineas = contenidoTexto.split(/\r?\n/);
+                const conceptos = {};
+                const descomposiciones = {};
+                const codigosHijos = new Set();
+
+                for (let linea of lineas) {
+                    if (linea.startsWith('~C|')) {
+                        const d = linea.split('|');
+                        conceptos[d[1]] = { codigo: d[1], resumen: d[3], precio: parseFloat(d[4].replace(',', '.')) || 0 };
+                    } else if (linea.startsWith('~D|')) {
+                        const d = linea.split('|');
+                        const padre = d[1];
+                        descomposiciones[padre] = [];
+                        for (let comp of d.slice(2)) {
+                            if (!comp || comp === '\\') continue;
+                            const hijo = comp.split('\\')[0];
+                            if (hijo) { descomposiciones[padre].push(hijo); codigosHijos.add(hijo); }
+                        }
+                    }
+                }
+
+                let raiz = null;
+                for (let c in conceptos) {
+                    if (!codigosHijos.has(c) && descomposiciones[c]) { raiz = c; break; }
+                }
+
+                const resultados = [];
+                if (raiz && descomposiciones[raiz]) {
+                    for (let hijo of descomposiciones[raiz]) {
+                        if (conceptos[hijo]) resultados.push({ capitulo: conceptos[hijo].resumen.substring(0,40), importe: conceptos[hijo].precio });
+                    }
+                }
+                return resultados;
+            }
+
+            // 5. ASIGNACIÓN EX
