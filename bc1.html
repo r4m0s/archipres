@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visor BC3 FIEBDC-3</title>
+    <style>
+        :root {
+            /* Paleta de colores UI Moderna y Limpia */
+            --bg-body: #F3F4F6;
+            --bg-panel: #FFFFFF;
+            --border: #E5E7EB;
+            --text-main: #1F2937;
+            --text-muted: #6B7280;
+            --primary: #2563EB;
+            --primary-hover: #1D4ED8;
+            --primary-light: #EFF6FF;
+            --success: #10B981;
+            --header-h: 60px;
+            --sidebar-w: 400px;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            font-size: 14px;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden; /* Evita el scroll global */
+        }
+
+        /* CABECERA */
+        header {
+            height: var(--header-h);
+            background-color: var(--bg-panel);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            z-index: 50;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+
+        .h-left { display: flex; align-items: center; gap: 12px; font-weight: 600; font-size: 15px;}
+        .h-left span { font-weight: 400; color: var(--text-muted); font-size: 13px; }
+
+        .h-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap;}
+        
+        button {
+            background: var(--bg-panel);
+            border: 1px solid var(--border);
+            color: var(--text-main);
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex; align-items: center; gap: 6px;
+        }
+        button:hover { background: var(--bg-body); }
+        button.primary { background: var(--primary); color: #fff; border-color: var(--primary); }
+        button.primary:hover { background: var(--primary-hover); }
+
+        /* CONTENEDOR PRINCIPAL */
+        #app-container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* ESTADO VACÍO (DRAG & DROP) */
+        #drop-zone {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: var(--bg-body);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 40;
+            transition: background-color 0.2s;
+        }
+        #drop-zone.dragover { background-color: var(--primary-light); }
+        
+        .drop-content {
+            background: var(--bg-panel);
+            border: 2px dashed #9CA3AF;
+            border-radius: 12px;
+            padding: 60px;
+            text-align: center;
+            max-width: 500px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+        }
+        .drop-content h2 { margin-bottom: 8px; color: var(--text-main); }
+        .drop-content p { color: var(--text-muted); margin-bottom: 20px; }
+
+        /* PANEL IZQUIERDO (ÁRBOL) */
+        aside {
+            width: var(--sidebar-w);
+            background: var(--bg-panel);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            visibility: hidden; /* Oculto hasta cargar */
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        aside.active { visibility: visible; opacity: 1; }
+
+        .search-box { padding: 12px; border-bottom: 1px solid var(--border); }
+        .search-box input {
+            width: 100%; padding: 8px 12px; border-radius: 6px;
+            border: 1px solid var(--border); background: var(--bg-body); outline: none;
+        }
+        .search-box input:focus { border-color: var(--primary); }
+
+        .tree-scroll { flex: 1; overflow-y: auto; padding: 10px 0; }
+
+        /* Estilos del Árbol */
+        ul { list-style: none; padding-left: 18px; }
+        #tree-root { padding-left: 0; }
+        .nested { display: none; border-left: 1px dashed var(--border); margin-left: 18px; }
+        .active-tree { display: block; }
+
+        .tree-node {
+            display: flex; align-items: center; padding: 6px 12px;
+            cursor: pointer; border-radius: 4px; margin: 2px 8px;
+            transition: background 0.1s;
+        }
+        .tree-node:hover { background: var(--bg-body); }
+        .tree-node.selected { background: var(--primary-light); }
+
+        .caret {
+            width: 20px; height: 20px; display: flex; align-items: center; justify-content: center;
+            color: var(--text-muted); font-size: 10px; flex-shrink: 0;
+        }
+        .caret:hover { color: var(--text-main); }
+        .caret::before { content: "▶"; }
+        .caret-down::before { content: "▼"; }
+        .dot { width: 20px; text-align: center; color: #D1D5DB; flex-shrink: 0;}
+        .dot::before { content: "•"; }
+
+        .node-info { display: flex; flex-direction: column; flex: 1; overflow: hidden; margin-left: 4px;}
+        .node-code { font-size: 11px; color: var(--text-muted); }
+        .node-text { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-main); }
+        .tree-node.selected .node-text { color: var(--primary); }
+        .node-price { font-weight: 600; font-size: 13px; margin-left: auto; padding-left: 10px;}
+
+        /* PANEL DERECHO (DETALLES) */
+        main {
+            flex: 1;
+            background: var(--bg-body);
+            overflow-y: auto;
+            padding: 30px;
+            display: none; /* Oculto hasta cargar */
+            position: relative;
+        }
+        main.active { display: block; }
+
+        .back-btn { display: none; margin-bottom: 20px; } /* Solo móvil */
+
+        .detail-header { margin-bottom: 24px; }
+        .detail-header h1 { font-size: 22px; color: var(--text-main); margin-bottom: 4px;}
+        
+        .grid-info { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px;}
+        .info-card { background: var(--bg-panel); padding: 16px; border-radius: 8px; border: 1px solid var(--border); box-shadow: 0 1px 2px rgba(0,0,0,0.02);}
+        .info-card label { display: block; font-size: 11px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 6px; letter-spacing: 0.5px;}
+        .info-card .val { font-weight: 600; font-size: 15px; color: var(--text-main); }
+        
+        .desc-card { background: var(--bg-panel); padding: 20px; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 24px; white-space: pre-wrap; line-height: 1.5; color: #4B5563;}
+
+        h3.section-title { font-size: 14px; text-transform: uppercase; color: var(--text-muted); margin-bottom: 12px; margin-top: 32px;}
+
+        table { width: 100%; border-collapse: collapse; background: var(--bg-panel); border-radius: 8px; overflow: hidden; border: 1px solid var(--border); text-align: left; }
+        th, td { padding: 12px 16px; border-bottom: 1px solid var(--border); }
+        th { background: #F9FAFB; font-weight: 600; color: var(--text-muted); font-size: 12px; text-transform: uppercase;}
+        tr:last-child td { border-bottom: none; }
+        .num { text-align: right; font-variant-numeric: tabular-nums; }
+        td.code-link { color: var(--primary); font-weight: 500;}
+        tfoot tr { background: #F9FAFB; font-weight: 600; }
+
+        /* RESPONSIVE DESING (MÓVILES Y TABLETS) */
+        @media (max-width: 900px) {
+            #app-container { flex-direction: column; }
+            aside { width: 100%; height: 100%; border-right: none; }
+            main { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 60; display: none; }
+            main.mobile-open { display: block; }
+            .back-btn { display: inline-flex; }
+            .h-right button span { display: none; } /* Ocultar texto de botones en móvil */
+            .drop-content { margin: 20px; padding: 40px 20px; }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="h-left">
+            Visor BC3 FIEBDC-3 
+            <span id="header-filename">Sin archivo cargado</span>
+        </div>
+        <div class="h-right">
+            <button onclick="expandAll()">▾ <span class="hide-mob">Expandir</span></button>
+            <button onclick="collapseAll()">▴ <span class="hide-mob">Contraer</span></button>
+            <button onclick="exportCSV()">↓ CSV</button>
+            <button onclick="alert('Función de comparación en desarrollo.')">⚖️ Comparar</button>
+            <input type="file" id="fileInput" accept=".bc3" style="display: none;">
+            <button class="primary" onclick="document.getElementById('fileInput').click()">Abrir BC3</button>
+        </div>
+    </header>
+
+    <div id="app-container">
+        
+        <div id="drop-zone">
+            <div class="drop-content">
+                <svg width="48" height="48" fill="none" stroke="#9CA3AF" stroke-width="1.5" viewBox="0 0 24 24" style="margin-bottom: 15px;">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m3.75 9v6m3-3H9m1.5-12H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"></path>
+                </svg>
+                <h2>Arrastra un archivo BC3</h2>
+                <p>o haz clic para seleccionar</p>
+                <button class="primary" style="margin: 0 auto;" onclick="document.getElementById('fileInput').click()">Examinar archivos</button>
+            </div>
+        </div>
+
+        <aside id="sidebar">
+            <div class="search-box">
+                <input type="text" id="searchInput" placeholder="Buscar código o descripción..." onkeyup="filterTree()">
+            </div>
+            <div class="tree-scroll">
+                <ul id="tree-root"></ul>
+            </div>
+        </aside>
+
+        <main id="main-panel">
+            <button class="back-btn" onclick="closeMobileDetails()">← Volver al presupuesto</button>
+            
+            <div id="empty-state-details" style="color: var(--text-muted); text-align: center; margin-top: 50px;">
+                Selecciona una partida en el panel izquierdo para ver sus detalles.
+            </div>
+
+            <div id="details-content" style="display: none;">
+                <div class="detail-header">
+                    <h1 id="det-title">-</h1>
+                </div>
+
+                <div class="grid-info">
+                    <div class="info-card">
+                        <label>Código</label>
+                        <div class="val" id="det-code" style="color: var(--primary);">-</div>
+                    </div>
+                    <div class="info-card">
+                        <label>Unidad</label>
+                        <div class="val" id="det-unit">-</div>
+                    </div>
+                    <div class="info-card">
+                        <label>Precio Total</label>
+                        <div class="val" id="det-price" style="color: var(--success); font-size: 20px;">-</div>
+                    </div>
+                </div>
+
+                <div class="desc-card">
+                    <label style="display: block; font-size: 11px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 8px;">Texto Descriptivo</label>
+                    <div id="det-desc">-</div>
+                </div>
+
+                <h3 class="section-title" id="decomp-title">Descomposición</h3>
+                <table id="decomp-table">
+                    <thead>
+                        <tr>
+                            <th>Código</th>
+                            <th>Descripción</th>
+                            <th class="num">Factor/Rend.</th>
+                            <th class="num">Precio Ud.</th>
+                            <th class="num">Importe</th>
+                        </tr>
+                    </thead>
+                    <tbody id="det-decomp-body"></tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="4" class="num">Total Descomposición:</td>
+                            <td class="num" id="det-decomp-total" style="color: var(--success);">0,00 €</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </main>
+
+    </div>
+
+    <script>
+        // Formateadores
+        const fmtMoney = new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' });
+        const fmtNum = new Intl.NumberFormat('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 3 });
+
+        let db = { concepts: {}, root: null, totalBudget: 0 };
+
+        // ==========================================
+        // EVENTOS ARRASTRAR Y SOLTAR (DRAG & DROP)
+        // ==========================================
+        const dropZone = document.getElementById('drop-zone');
+        
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            document.body.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) { e.preventDefault(); e.stopPropagation(); }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => dropZone.classList.add('dragover'), false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => dropZone.classList.remove('dragover'), false);
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            let dt = e.dataTransfer;
+            let files = dt.files;
+            if (files.length) handleFile(files[0]);
+        });
+
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            if (e.target.files.length) handleFile(e.target.files[0]);
+        });
+
+        function handleFile(file) {
+            if (!file.name.toLowerCase().endsWith('.bc3')) {
+                alert("Por favor, selecciona un archivo válido con extensión .bc3");
+                return;
+            }
+            document.getElementById('header-filename').textContent = file.name;
+            const reader = new FileReader();
+            reader.readAsText(file, 'windows-1252'); // Codificación estándar en España
+            reader.onload = function(e) {
+                dropZone.style.display = 'none'; // Ocultar drag & drop
+                document.getElementById('sidebar').classList.add('active');
+                document.getElementById('main-panel').classList.add('active');
+                parseBC3(e.target.result);
+                renderTree();
+            };
+        }
+
+        // ==========================================
+        // MOTOR DE PARSEO BC3 (Tolerante a desorden)
+        // ==========================================
+        function parseBC3(content) {
+            db.concepts = {}; db.root = null; db.totalBudget = 0;
+            const isChild = new Set();
+            
+            const getConcept = (code) => {
+                if (!db.concepts[code]) {
+                    db.concepts[code] = { code: code, unit: '', summary: code, price: 0, children: [], description: '' };
+                }
+                return db.concepts[code];
+            };
+
+            content = content.replace(/^\uFEFF/, '');
+            const lines = content.split(/\r?\n/);
+            const records = [];
+            let currentRecord = "";
+            
+            for (let i = 0; i < lines.length; i++) {
+                let line = lines[i];
+                if (line.trim() === '') continue;
+                if (line.trimStart().startsWith('~')) {
+                    if (currentRecord) records.push(currentRecord);
+                    currentRecord = line.trimStart();
+                } else if (currentRecord) {
+                    currentRecord += line; // Empalmar líneas cortadas
+                }
+            }
+            if (currentRecord) records.push(currentRecord);
+
+            records.forEach(record => {
+                const parts = record.split('|');
+                const type = parts[0].trim();
+
+                if (type === '~C') {
+                    let code = parts[1] ? parts[1].trim() : null; 
+                    if (!code) return;
+                    let concept = getConcept(code);
+                    concept.unit = parts[2] ? parts[2].trim() : concept.unit;
+                    concept.summary = parts[3] ? parts[3].trim() : concept.summary;
+                    concept.price = parseFloat((parts[4] || '0').replace(',', '.')) || concept.price;
+                } 
+                else if (type === '~D') {
+                    let parentCode = parts[1] ? parts[1].trim() : null;
+                    if (!parentCode) return;
+                    let parent = getConcept(parentCode);
+                    
+                    let childrenString = parts[2] || '';
+                    const childrenData = childrenString.split('\\');
+                    
+                    for (let i = 0; i < childrenData.length; i += 2) {
+                        let childCode = childrenData[i] ? childrenData[i].trim() : null;
+                        if (!childCode) continue;
+                        let factor = parseFloat((childrenData[i+1] || '1').replace(',', '.')) || 0;
+                        parent.children.push({ concept: getConcept(childCode), factor: factor });
+                        isChild.add(childCode);
+                    }
+                }
+                else if (type === '~T') {
+                    let code = parts[1] ? parts[1].trim() : null;
+                    if (!code) return;
+                    getConcept(code).description = (parts[2] || '').replace(/\\n/gi, '\n');
+                }
+            });
+
+            // Encontrar Raíz (el de mayor precio que no sea hijo)
+            const possibleRoots = Object.keys(db.concepts).filter(k => db.concepts[k].children.length > 0 && !isChild.has(k));
+            if (possibleRoots.length > 0) {
+                db.root = possibleRoots.reduce((a, b) => (db.concepts[a].price > db.concepts[b].price) ? a : b);
+            } else if (Object.keys(db.concepts).length > 0) {
+                db.root = Object.keys(db.concepts)[0];
+            }
+            db.totalBudget = db.root ? db.concepts[db.root].price : 0;
+        }
+
+        // ==========================================
+        // RENDERIZADO VISUAL
+        // ==========================================
+        function renderTree() {
+            const rootEl = document.getElementById('tree-root');
+            rootEl.innerHTML = '';
+            
+            if (!db.root) return;
+            const rootConcept = db.concepts[db.root];
+
+            rootConcept.children.forEach(child => {
+                rootEl.appendChild(createTreeNode(child.concept));
+            });
+        }
+
+        function createTreeNode(concept) {
+            const li = document.createElement('li');
+            const hasChildren = concept.children.length > 0;
+            
+            const nodeDiv = document.createElement('div');
+            nodeDiv.className = 'tree-node';
+            
+            const icon = document.createElement('span');
+            icon.className = hasChildren ? 'caret' : 'dot';
+            
+            const info = document.createElement('div');
+            info.className = 'node-info';
+            info.innerHTML = `<div class="node-code">${concept.code}</div><div class="node-text" title="${concept.summary}">${concept.summary}</div>`;
+            
+            const price = document.createElement('div');
+            price.className = 'node-price';
+            price.textContent = fmtMoney.format(concept.price);
+
+            nodeDiv.appendChild(icon);
+            nodeDiv.appendChild(info);
+            nodeDiv.appendChild(price);
+            li.appendChild(nodeDiv);
+
+            if (hasChildren) {
+                const ul = document.createElement('ul');
+                ul.className = 'nested';
+                concept.children.forEach(child => ul.appendChild(createTreeNode(child.concept)));
+                li.appendChild(ul);
+
+                icon.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    icon.classList.toggle('caret-down');
+                    ul.classList.toggle('active-tree');
+                });
+            }
+
+            nodeDiv.addEventListener('click', (e) => {
+                e.stopPropagation();
+                document.querySelectorAll('.tree-node').forEach(el => el.classList.remove('selected'));
+                nodeDiv.classList.add('selected');
+                showDetails(concept);
+                
+                // Lógica Responsive: Abrir panel derecho en móviles
+                if(window.innerWidth <= 900) {
+                    document.getElementById('main-panel').classList.add('mobile-open');
+                }
+            });
+
+            return li;
+        }
+
+        function showDetails(concept) {
+            document.getElementById('empty-state-details').style.display = 'none';
+            document.getElementById('details-content').style.display = 'block';
+            
+            document.getElementById('det-title').textContent = concept.summary;
+            document.getElementById('det-code').textContent = concept.code;
+            document.getElementById('det-unit').textContent = concept.unit || '-';
+            document.getElementById('det-price').textContent = fmtMoney.format(concept.price);
+            document.getElementById('det-desc').textContent = concept.description || concept.summary;
+
+            const tbody = document.getElementById('det-decomp-body');
+            tbody.innerHTML = '';
+            
+            if (concept.children.length > 0) {
+                document.getElementById('decomp-table').style.display = 'table';
+                let total = 0;
+                concept.children.forEach(child => {
+                    const c = child.concept;
+                    const importe = child.factor * c.price;
+                    total += importe;
+                    tbody.innerHTML += `
+                        <tr>
+                            <td class="code-link">${c.code}</td>
+                            <td>${c.summary}</td>
+                            <td class="num">${fmtNum.format(child.factor)} ${c.unit}</td>
+                            <td class="num">${fmtMoney.format(c.price)}</td>
+                            <td class="num" style="font-weight: 600;">${fmtMoney.format(importe)}</td>
+                        </tr>
+                    `;
+                });
+                document.getElementById('det-decomp-total').textContent = fmtMoney.format(total);
+            } else {
+                document.getElementById('decomp-table').style.display = 'none';
+            }
+        }
+
+        // ==========================================
+        // FUNCIONES AUXILIARES (UI y Exportación)
+        // ==========================================
+        function expandAll() {
+            document.querySelectorAll('ul.nested').forEach(ul => ul.classList.add('active-tree'));
+            document.querySelectorAll('.caret').forEach(c => c.classList.add('caret-down'));
+        }
+
+        function collapseAll() {
+            document.querySelectorAll('ul.nested').forEach(ul => ul.classList.remove('active-tree'));
+            document.querySelectorAll('.caret').forEach(c => c.classList.remove('caret-down'));
+        }
+
+        function filterTree() {
+            const filter = document.getElementById('searchInput').value.toLowerCase();
+            const nodes = document.querySelectorAll('.tree-node');
+            nodes.forEach(node => {
+                const text = node.textContent.toLowerCase();
+                node.style.display = text.includes(filter) ? 'flex' : 'none';
+            });
+        }
+
+        function closeMobileDetails() {
+            document.getElementById('main-panel').classList.remove('mobile-open');
+        }
+
+        function exportCSV() {
+            if (!db.root) return alert('No hay ningún presupuesto cargado.');
+            let csv = 'Código;Resumen;Unidad;Precio\n';
+            for (let key in db.concepts) {
+                let c = db.concepts[key];
+                let priceStr = c.price.toString().replace('.', ',');
+                csv += `"${c.code}";"${c.summary}";"${c.unit}";"${priceStr}"\n`;
+            }
+            const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csv], {type: 'text/csv;charset=utf-8'});
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = "presupuesto_exportado.csv";
+            link.click();
+        }
+    </script>
+</body>
+</html>
