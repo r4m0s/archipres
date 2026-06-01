@@ -10,7 +10,6 @@
         details > summary::-webkit-details-marker { display: none; }
         .tree-line { border-left: 2px solid #e5e7eb; margin-left: 12px; padding-left: 12px; }
         .drag-over { background-color: #eff6ff !important; border-color: #3b82f6 !important; }
-        /* Scrollbar suave para paneles largos */
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: #f1f1f1; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
@@ -47,7 +46,6 @@
 
         <section class="flex-1 bg-slate-50 p-6 overflow-y-auto relative">
             <div id="details-panel" class="hidden max-w-5xl mx-auto">
-                
                 <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
                     <div class="flex items-start justify-between mb-4">
                         <div>
@@ -82,13 +80,12 @@
                         <tbody id="breakdown-table"></tbody>
                     </table>
                     <div id="no-breakdown" class="p-6 text-center text-gray-500 hidden">
-                        Este elemento no tiene descomposición (Es un concepto básico o material).
+                        Este elemento no tiene descomposición.
                     </div>
                 </div>
-
             </div>
             
-            <div id="empty-state" class="absolute inset-0 flex flex-col items-center justify-center text-gray-400">
+            <div id="empty-state" class="absolute inset-0 flex flex-col items-center justify-center text-gray-400 bg-slate-50 z-10">
                 <svg class="w-16 h-16 mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                 <p>Selecciona un capítulo o partida en el panel izquierdo.</p>
             </div>
@@ -97,10 +94,8 @@
     </main>
 
     <script>
-        // --- BASE DE DATOS GLOBAL ---
         let dbBC3 = { conceptos: {}, descomposiciones: {}, raiz: null };
 
-        // --- 1. EVENTOS DE ARCHIVOS ---
         const dropBox = document.getElementById('drop-box');
         const fileInput = document.getElementById('file-input');
 
@@ -116,7 +111,6 @@
             if (e.target.files.length) procesarArchivo(e.target.files[0]);
         });
 
-        // --- 2. LECTOR Y PARSER AVANZADO FIEBDC-3 ---
         function parseNum(val) {
             if(!val) return 0;
             return parseFloat(val.toString().replace(',', '.')) || 0;
@@ -125,13 +119,17 @@
         function procesarArchivo(file) {
             const reader = new FileReader();
             reader.onload = function(e) {
-                analizarTextoBC3(e.target.result);
-                construirArbolUI();
-                document.getElementById('btn-export-csv').classList.remove('hidden');
-                document.getElementById('empty-state').classList.remove('hidden');
-                document.getElementById('details-panel').classList.add('hidden');
+                try {
+                    analizarTextoBC3(e.target.result);
+                    construirArbolUI();
+                    document.getElementById('btn-export-csv').classList.remove('hidden');
+                    document.getElementById('empty-state').classList.remove('hidden');
+                    document.getElementById('details-panel').classList.add('hidden');
+                } catch (err) {
+                    console.error(err);
+                    alert("Error interno al procesar el archivo. Revisa la consola (F12) para más detalles.");
+                }
             };
-            // Windows-1252 asegura la lectura correcta de acentos y eñes
             reader.readAsText(file, 'windows-1252'); 
         }
 
@@ -139,65 +137,59 @@
             dbBC3 = { conceptos: {}, descomposiciones: {}, raiz: null };
             const codigosHijos = new Set();
             
-            // Paso A: Unir líneas truncadas (El estándar usa \r\n, pero los textos largos ~T pueden tener saltos internos)
             const lineas = texto.split(/\r?\n/);
             const records = [];
             let currentRecord = "";
             
             for(let linea of lineas) {
-                // Si la línea empieza por ~ y una Letra Mayúscula seguida de |
                 if(linea.match(/^~[A-Z]\|/)) {
                     if(currentRecord) records.push(currentRecord);
                     currentRecord = linea;
                 } else if(linea.trim() !== "") {
-                    // Si no empieza así, es la continuación del texto del registro anterior
                     currentRecord += (currentRecord ? "\n" : "") + linea;
                 }
             }
             if(currentRecord) records.push(currentRecord);
 
-            // Paso B: Procesar registros
             for (let record of records) {
                 if (record.startsWith('~C|')) {
-                    // Conceptos (Capítulos, Partidas, Materiales)
                     const cols = record.split('|');
-                    dbBC3.conceptos[cols[1]] = {
-                        codigo: cols[1],
-                        unidad: cols[2] || 'ud',
-                        resumen: cols[3] || 'Sin descripción',
+                    if (cols.length < 2) continue;
+                    const codigo = cols[1].trim(); // Trim añadido para evitar fallos de espacios
+                    dbBC3.conceptos[codigo] = {
+                        codigo: codigo,
+                        unidad: cols[2] ? cols[2].trim() : 'ud',
+                        resumen: cols[3] ? cols[3].trim() : 'Sin descripción',
                         precio: parseNum(cols[4]),
                         esCapitulo: false,
                         textoLargo: ''
                     };
                 } 
                 else if (record.startsWith('~T|')) {
-                    // Textos descriptivos largos
                     const parts = record.split('|');
-                    const codigo = parts[1];
-                    // Volver a unir por si el texto original contenía el símbolo |
-                    let texto = parts.slice(2).join('|'); 
-                    if(texto.endsWith('|')) texto = texto.slice(0, -1);
+                    if (parts.length < 2) continue;
+                    const codigo = parts[1].trim();
+                    let textoLargo = parts.slice(2).join('|'); 
+                    if(textoLargo.endsWith('|')) textoLargo = textoLargo.slice(0, -1);
                     if (dbBC3.conceptos[codigo]) {
-                        dbBC3.conceptos[codigo].textoLargo = texto.trim();
+                        dbBC3.conceptos[codigo].textoLargo = textoLargo.trim();
                     }
                 }
                 else if (record.startsWith('~D|')) {
-                    // Descomposiciones (La jerarquía: Padre -> Hijos)
                     const cols = record.split('|');
-                    const padre = cols[1];
+                    if (cols.length < 2) continue;
+                    const padre = cols[1].trim(); // Trim añadido
                     
-                    // IMPORTANTE: NO inicializar como array vacío si ya existe,
-                    // porque programas como Presto cortan las listas largas en varios ~D
                     if (!dbBC3.descomposiciones[padre]) {
                         dbBC3.descomposiciones[padre] = [];
                     }
                     
                     for (let i = 2; i < cols.length; i++) {
                         let comp = cols[i].trim();
-                        if (!comp || comp === '\\') continue; // Limpiar finales vacíos
+                        if (!comp || comp === '\\') continue;
                         
                         const partes = comp.split('\\');
-                        const hijo = partes[0];
+                        const hijo = partes[0].trim(); // Trim añadido
                         const cantidad = partes.length > 1 && partes[1] !== '' ? parseNum(partes[1]) : 1;
                         
                         if (hijo) {
@@ -208,12 +200,11 @@
                 }
             }
 
-            // Paso C: Determinar la naturaleza de los conceptos y encontrar la Raíz
             for (let padre in dbBC3.descomposiciones) {
                 if (dbBC3.conceptos[padre]) dbBC3.conceptos[padre].esCapitulo = true;
             }
 
-            // La raíz del proyecto es el nodo que tiene descomposición pero que NUNCA es hijo de otro
+            // Detección de Raíz robustecida
             let posiblesRaices = [];
             for (let c in dbBC3.descomposiciones) {
                 if (!codigosHijos.has(c)) posiblesRaices.push(c);
@@ -221,18 +212,31 @@
             
             if (posiblesRaices.length > 0) {
                 dbBC3.raiz = posiblesRaices[0];
-            } else if (Object.keys(dbBC3.descomposiciones).length > 0) {
-                dbBC3.raiz = Object.keys(dbBC3.descomposiciones)[0]; // Fallback de seguridad
+            } else {
+                // Fallback de seguridad si hay bucles
+                const keys = Object.keys(dbBC3.descomposiciones);
+                if (keys.length > 0) dbBC3.raiz = keys[0];
+            }
+
+            // CREACIÓN DE RAÍZ VIRTUAL: Si la raíz existe en ~D pero el programa no la exportó en ~C
+            if (dbBC3.raiz && !dbBC3.conceptos[dbBC3.raiz]) {
+                dbBC3.conceptos[dbBC3.raiz] = {
+                    codigo: dbBC3.raiz,
+                    unidad: '',
+                    resumen: 'PROYECTO (Raíz Principal)',
+                    precio: 0,
+                    esCapitulo: true,
+                    textoLargo: 'Nodo raíz generado automáticamente por el visor.'
+                };
             }
         }
 
-        // --- 3. CONSTRUCTOR DEL ÁRBOL VISUAL ---
         function construirArbolUI() {
             const container = document.getElementById('tree-container');
             container.innerHTML = ''; 
 
             if (!dbBC3.raiz || !dbBC3.conceptos[dbBC3.raiz]) {
-                container.innerHTML = '<p class="text-red-500 font-bold p-4">Error: No se encontró la jerarquía raíz del presupuesto. Verifica el archivo.</p>';
+                container.innerHTML = '<p class="text-red-500 font-bold p-4">Error crítico: Archivo vacío o estructura FIEBDC-3 irreconocible.</p>';
                 return;
             }
 
@@ -244,17 +248,16 @@
             const concepto = dbBC3.conceptos[codigoNodo];
             const descomp = dbBC3.descomposiciones[codigoNodo];
             
-            if (!concepto) return document.createTextNode('');
+            // Si el hijo no está en el bloque ~C (referencia fantasma), lo saltamos
+            if (!concepto) return document.createTextNode(''); 
 
             if (descomp && descomp.length > 0) {
-                // Es Capítulo o Proyecto
                 const details = document.createElement('details');
                 if (isOpen) details.open = true;
                 
                 const summary = document.createElement('summary');
                 summary.className = "flex items-center gap-2 py-1.5 hover:bg-blue-50 rounded select-none group border-b border-transparent hover:border-blue-100 transition-colors";
                 
-                // Icono carpeta abierta/cerrada según estado
                 summary.innerHTML = `
                     <svg class="w-4 h-4 text-slate-400 group-open:rotate-90 transition-transform flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
                     <span class="font-bold text-slate-800 text-sm w-16 shrink-0">${concepto.codigo}</span>
@@ -278,7 +281,6 @@
                 details.appendChild(divHijos);
                 return details;
             } else {
-                // Es Partida Final (Hoja)
                 const div = document.createElement('div');
                 div.className = "flex items-center gap-2 py-1.5 hover:bg-blue-50 rounded cursor-pointer pl-6 border-b border-transparent hover:border-blue-100 transition-colors";
                 div.innerHTML = `
@@ -291,7 +293,6 @@
             }
         }
 
-        // --- 4. PANEL DE DETALLES ---
         function mostrarDetalles(codigo) {
             document.getElementById('empty-state').classList.add('hidden');
             const panel = document.getElementById('details-panel');
@@ -303,22 +304,19 @@
             document.getElementById('detail-code').innerText = c.codigo;
             document.getElementById('detail-resumen').innerText = c.resumen;
             
-            // Mostrar texto descriptivo largo si existe, sino el resumen
             const desc = c.textoLargo || "";
             document.getElementById('detail-desc').innerText = desc;
 
             document.getElementById('detail-price').innerText = c.precio.toLocaleString('es-ES', {minimumFractionDigits: 2}) + ' €';
             document.getElementById('detail-unit').innerText = `Unidad: ${c.unidad}`;
 
-            // Determinar Tipo:
             let esProyectoRaiz = dbBC3.raiz === codigo;
-            let tipoLabel = esProyectoRaiz ? "Proyecto" : (c.esCapitulo ? "Capítulo" : "Partida");
+            let tipoLabel = esProyectoRaiz ? "Proyecto" : (c.esCapitulo ? "Capítulo / Subcapítulo" : "Partida / Concepto");
             document.getElementById('detail-type').innerText = tipoLabel;
             document.getElementById('detail-type').className = c.esCapitulo 
                 ? "bg-slate-700 text-white text-xs font-bold px-2.5 py-1 rounded" 
                 : "bg-blue-100 text-blue-800 text-xs font-bold px-2.5 py-1 rounded";
 
-            // Tabla de Descomposición
             const tb = document.getElementById('breakdown-table');
             const msgVacio = document.getElementById('no-breakdown');
             tb.innerHTML = '';
@@ -329,9 +327,8 @@
                 tb.parentElement.classList.remove('hidden');
                 msgVacio.classList.add('hidden');
                 
-                // Adaptar títulos de la tabla
                 document.getElementById('table-title').innerText = c.esCapitulo ? "Partidas/Subcapítulos" : "Descomposición";
-                document.getElementById('col-cantidad').innerText = c.esCapitulo ? "Medición (Total)" : "Rendimiento";
+                document.getElementById('col-cantidad').innerText = c.esCapitulo ? "Medición" : "Rendimiento";
                 
                 let totalSuma = 0;
 
@@ -355,8 +352,7 @@
                     tb.appendChild(tr);
                 });
 
-                // Mostrar suma total en el subtítulo
-                document.getElementById('table-subtitle').innerText = `Suma Costes: ${totalSuma.toLocaleString('es-ES', {minimumFractionDigits: 2})} €`;
+                document.getElementById('table-subtitle').innerText = `Coste Directo Calculado: ${totalSuma.toLocaleString('es-ES', {minimumFractionDigits: 2})} €`;
 
             } else {
                 tb.parentElement.classList.add('hidden');
