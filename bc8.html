@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visor BC3 Profesional Dinámico</title>
+    <style>
+        :root {
+            --bg-page: #F3F4F6;
+            --bg-panels: #FFFFFF;
+            --primary-accent: #059669;
+            --primary-accent-faint: #ECFDF5;
+            --purple-box: #6D28D9;
+            --purple-box-faint: #F5F3FF;
+            --border-color: #E5E7EB;
+            --text-dark: #1F2937;
+            --text-muted: #6B7280;
+            --sidebar-width: 350px;
+            --header-height: 56px;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            background-color: var(--bg-page);
+            color: var(--text-dark);
+            font-size: 14px;
+            overflow: hidden;
+        }
+
+        /* HEADER */
+        header {
+            height: var(--header-height);
+            background-color: var(--bg-panels);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 16px;
+            z-index: 100;
+        }
+
+        .header-left { display: flex; align-items: center; gap: 8px; font-weight: 500;}
+        .header-left span { color: var(--text-muted); font-size: 13px; margin-left: 8px;}
+
+        .header-right { display: flex; align-items: center; gap: 8px; }
+
+        button {
+            padding: 6px 14px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            border: 1px solid var(--border-color);
+            background-color: var(--bg-panels);
+            color: var(--text-dark);
+            transition: all 0.2s;
+        }
+        button:hover { background-color: var(--bg-page); }
+        button.btn-primary {
+            background-color: #2563EB;
+            color: white;
+            border: none;
+        }
+        button.btn-primary:hover { background-color: #1D4ED8; }
+
+        /* MAIN LAYOUT */
+        #main-content {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* SIDEBAR (Tree) */
+        aside {
+            width: var(--sidebar-width);
+            background-color: var(--bg-panels);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .search-container { padding: 12px; border-bottom: 1px solid var(--border-color); }
+        .search-container input {
+            width: 100%; padding: 8px 12px; border-radius: 6px;
+            border: 1px solid var(--border-color); background-color: var(--bg-page); font-size: 13px;
+        }
+
+        .tree-container {
+            flex: 1; overflow-y: auto; padding: 8px 0;
+        }
+
+        .tree-root-item {
+            display: flex; align-items: center; padding: 12px 16px; gap: 12px;
+            border-bottom: 1px solid var(--border-color); background-color: #f9fafb;
+        }
+        .tree-root-item .price-info { text-align: right; margin-left: auto;}
+        .tree-root-item .price-info .price { font-weight: 600; font-size: 15px;}
+
+        ul.tree-list { list-style: none; padding: 0; margin: 0; }
+        ul.nested { display: none; padding-left: 24px; border-left: 1px dashed var(--border-color); margin-left: 20px;}
+        ul.active { display: block; }
+        
+        .tree-node-item {
+            display: flex; align-items: center; padding: 8px 16px 8px 8px;
+            cursor: pointer; position: relative; border-radius: 4px; margin: 2px 8px;
+        }
+        .tree-node-item:hover { background-color: var(--bg-page); }
+        .tree-node-item.selected { 
+            background-color: var(--primary-accent-faint);
+            color: var(--primary-accent);
+        }
+
+        .caret, .node-dot {
+            width: 16px; height: 16px; display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0; margin-right: 8px; font-size: 10px; color: var(--text-muted);
+        }
+        .caret { cursor: pointer; }
+        .caret:hover { color: var(--text-dark); }
+        .caret::before { content: "▶"; }
+        .caret.caret-down::before { content: "▼"; }
+        .node-dot::before { content: "•"; font-size: 16px;}
+
+        .node-content { display: flex; flex-direction: column; flex: 1; overflow: hidden;}
+        .node-meta { font-size: 11px; color: var(--text-muted); }
+        .node-title { font-weight: 500; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
+        
+        .node-financials { text-align: right; margin-left: 8px; display: flex; align-items: flex-end; flex-direction: column; gap: 2px;}
+        .node-price { font-weight: 600; font-size: 12px;}
+        .node-percentage-container { display: flex; align-items: center; gap: 6px; width: 100%; justify-content: flex-end;}
+        .node-percentage { font-size: 10px; color: var(--text-muted); }
+        .node-progress-bar-bg { width: 30px; height: 3px; background-color: var(--border-color); border-radius: 2px;}
+        .node-progress-bar { height: 100%; border-radius: 2px; background-color: var(--text-muted);}
+        .tree-node-item.selected .node-progress-bar { background-color: var(--primary-accent); }
+
+        .sidebar-footer {
+            padding: 12px 16px; border-top: 1px solid var(--border-color);
+            background-color: var(--bg-panels); font-size: 11px; color: var(--text-muted);
+            display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 4px;
+        }
+
+        /* RIGHT PANEL */
+        main { flex: 1; padding: 24px 32px; overflow-y: auto; background-color: var(--bg-page); }
+
+        #empty-state { display: flex; height: 100%; align-items: center; justify-content: center; color: var(--text-muted); font-size: 16px;}
+        
+        .panel-title { font-size: 20px; font-weight: 600; margin: 0 0 20px 0; color: var(--text-dark); }
+        .data-field { margin-bottom: 16px; }
+        .data-field label { display: block; font-size: 11px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px; }
+        .field-value { padding: 10px 14px; background-color: #f9fafb; border-radius: 8px; border: 1px solid #f3f4f6; font-weight: 500; font-size: 13px; white-space: pre-wrap; }
+
+        .price-card { background-color: var(--purple-box-faint); border: 1px solid #d8b4fe; border-radius: 10px; padding: 20px; margin-bottom: 24px; }
+        .price-card .price-large { font-size: 32px; font-weight: 700; color: var(--purple-box); margin: 0; }
+        .price-card .price-desc { font-size: 13px; color: #7c3aed; margin: 4px 0 0 0; }
+        
+        .progress-section { margin-top: 16px; }
+        .progress-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 6px; }
+        .progress-bar-main { height: 10px; background-color: #ede9fe; border-radius: 5px; position: relative; }
+        .progress-bar-fill { height: 100%; background-color: #8b5cf6; border-radius: 5px; transition: width 0.3s ease;}
+        .progress-text { position: absolute; right: 0; top: -20px; font-size: 13px; font-weight: 600; color: var(--purple-box); }
+
+        section.tables-area h3 { font-size: 13px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; margin: 24px 0 12px 0; }
+        table { width: 100%; border-collapse: collapse; background-color: var(--bg-panels); border-radius: 8px; overflow: hidden; border: 1px solid var(--border-color); font-size: 13px; }
+        table thead { background-color: #f9fafb; }
+        table th, table td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--border-color); }
+        table th { color: var(--text-muted); font-weight: 500; }
+        table tr:last-child td { border-bottom: none; }
+        table td.num { font-weight: 500; text-align: right; }
+        table td.highlight { color: #2563eb; }
+        table tfoot tr { background-color: #f9fafb; font-weight: 600; }
+        table tfoot td { color: var(--purple-box); text-align: right; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="header-left">
+            <span id="header-filename">Ningún archivo cargado</span>
+        </div>
+        <div class="header-right">
+            <button onclick="expandAll()">• Expandir</button>
+            <button onclick="collapseAll()">• Contraer</button>
+            <input type="file" id="fileInput" accept=".bc3" style="display: none;">
+            <button class="btn-primary" onclick="document.getElementById('fileInput').click()">Abrir BC3</button>
+        </div>
+    </header>
+
+    <div id="main-content">
+        <aside>
+            <div class="search-container">
+                <input type="text" id="searchInput" placeholder="Buscar código o descripción..." disabled>
+            </div>
+            
+            <div class="tree-root-item" id="tree-root-header" style="display: none;">
+                <div class="content" id="root-title"></div>
+                <div class="price-info">
+                    <div class="price" id="root-price"></div>
+                </div>
+            </div>
+
+            <div class="tree-container">
+                <ul class="tree-list" id="tree-root">
+                    <li style="padding: 20px; color: #6B7280; text-align: center;">Haz clic en "Abrir BC3" para cargar un presupuesto.</li>
+                </ul>
+            </div>
+
+            <div class="sidebar-footer">
+                <span id="count-cap">0 capítulos</span>
+                <span id="count-part">0 partidas</span>
+                <span id="count-con">0 conceptos</span>
+                <span>GG 13% • BI 6% • IVA 21%</span>
+            </div>
+        </aside>
+
+        <main>
+            <div id="empty-state">Selecciona una partida en el panel izquierdo para ver sus detalles.</div>
+            
+            <div id="details-panel" style="display: none;">
+                <h1 class="panel-title" id="det-title">-</h1>
+
+                <div class="data-field">
+                    <label>CÓDIGO</label>
+                    <div class="field-value" id="det-code">-</div>
+                </div>
+
+                <div class="data-field">
+                    <label>RESUMEN</label>
+                    <div class="field-value" id="det-summary">-</div>
+                </div>
+
+                <div class="data-field">
+                    <label>TEXTO DESCRIPTIVO</label>
+                    <div class="field-value" id="det-desc" style="min-height: 60px;">-</div>
+                </div>
+
+                <div class="price-card">
+                    <h2 class="price-large" id="det-price-large">0,00 €</h2>
+                    <p class="price-desc" id="det-price-desc">0% del presupuesto total</p>
+                    <div class="progress-section">
+                        <div class="progress-label">PESO SOBRE EL TOTAL</div>
+                        <div class="progress-bar-main">
+                            <div class="progress-bar-fill" id="det-progress-fill" style="width: 0%;"></div>
+                            <div class="progress-text" id="det-progress-text">0%</div>
+                        </div>
+                    </div>
+                </div>
+
+                <section class="tables-area">
+                    <h3>PRECIO CON COEFICIENTES (Simulación)</h3>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>CONCEPTO</th>
+                                <th style="text-align: center;">%</th>
+                                <th style="text-align: right;">IMPORTE</th>
+                            </tr>
+                        </thead>
+                        <tbody id="det-coeffs-body">
+                            </tbody>
+                    </table>
+
+                    <h3 id="decomp-title">DESCOMPOSICIÓN</h3>
+                    <table id="decomp-table">
+                        <thead>
+                            <tr>
+                                <th>CÓDIGO</th>
+                                <th>DESCRIPCIÓN</th>
+                                <th style="text-align: center;">UD</th>
+                                <th style="text-align: right;">FACTOR</th>
+                                <th style="text-align: right;">REND</th>
+                                <th style="text-align: right;">PARCIAL</th>
+                            </tr>
+                        </thead>
+                        <tbody id="det-decomp-body">
+                            </tbody>
+                        <tfoot>
+                            <tr>
+                                <td colspan="5">Total descomposición</td>
+                                <td class="num" id="det-decomp-total" style="font-weight: 700;">0,00 €</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        let db = { concepts: {}, root: null, totalBudget: 0 };
+        const formatter = new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' });
+        const numFormatter = new Intl.NumberFormat('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 3 });
+
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            document.getElementById('header-filename').textContent = file.name;
+            const reader = new FileReader();
+            reader.readAsText(file, 'windows-1252'); // Codificación FIEBDC
+            reader.onload = function(e) {
+                parseBC3(e.target.result);
+                renderTree();
+            };
+        });
+
+        function parseBC3(content) {
+            db.concepts = {};
+            db.root = null;
+            const decompositions = [];
+            const isChild = new Set();
+            
+            content = content.replace(/^\uFEFF/, '').trim();
+            const lines = content.split(/\r?\n/);
+            const records = [];
+            let currentRecord = "";
+            
+            lines.forEach(line => {
+                let tLine = line.trim();
+                if (/^~[A-Z0-9@]/.test(tLine)) {
+                    if (currentRecord !== "") records.push(currentRecord);
+                    currentRecord = tLine;
+                } else {
+                    currentRecord += "\n" + tLine;
+                }
+            });
+            if (currentRecord !== "") records.push(currentRecord);
+
+            records.forEach(record => {
+                const parts = record.split('|');
+                const type = parts[0].trim();
+
+                if (type === '~C') {
+                    const code = parts[1] ? parts[1].trim() : null;
+                    if (!code) return;
+                    db.concepts[code] = {
+                        code: code,
+                        unit: parts[2] ? parts[2].trim() : '',
+                        summary: parts[3] ? parts[3].trim() : '',
+                        price: parseFloat((parts[4] || '0').replace(',', '.')) || 0,
+                        children: [],
+                        description: ''
+                    };
+                } 
+                else if (type === '~D') {
+                    const parent = parts[1] ? parts[1].trim() : null;
+                    if (!parent) return;
+                    let childrenString = (parts[2] || '').replace(/\\$/, '');
+                    const childrenData = childrenString.split('\\');
+                    for (let i = 0; i < childrenData.length; i += 2) {
+                        const childCode = childrenData[i] ? childrenData[i].trim() : null;
+                        const factor = parseFloat((childrenData[i+1] || '1').replace(',', '.')) || 0;
+                        if (childCode) {
+                            decompositions.push({ parent, child: childCode, factor });
+                            isChild.add(childCode);
+                        }
+                    }
+                }
+                else if (type === '~T') {
+                    const code = parts[1] ? parts[1].trim() : null;
+                    if (code && db.concepts[code]) {
+                        db.concepts[code].description = (parts[2] || '').replace(/\\n/g, '\n');
+                    }
+                }
+            });
+
+            decompositions.forEach(dec => {
+                if (db.concepts[dec.parent] && db.concepts[dec.child]) {
+                    db.concepts[dec.parent].children.push({ concept: db.concepts[dec.child], factor: dec.factor });
+                }
+            });
+
+            const possibleRoots = Object.keys(db.concepts).filter(code => db.concepts[code].children.length > 0 && !isChild.has(code));
+            db.root = possibleRoots.length > 0 ? possibleRoots[0] : (Object.keys(db.concepts)[0] || null);
+            db.totalBudget = db.root ? db.concepts[db.root].price : 0;
+        }
+
+        function renderTree() {
+            const treeRoot = document.getElementById('tree-root');
+            treeRoot.innerHTML = '';
+            document.getElementById('empty-state').style.display = 'flex';
+            document.getElementById('details-panel').style.display = 'none';
+            document.getElementById('searchInput').disabled = false;
+            
+            if (!db.root || !db.concepts[db.root]) {
+                treeRoot.innerHTML = '<li style="padding: 20px; color: red;">Error al procesar el archivo.</li>';
+                return;
+            }
+
+            // Actualizar Cabecera de la Raíz
+            const rootConcept = db.concepts[db.root];
+            document.getElementById('tree-root-header').style.display = 'flex';
+            document.getElementById('root-title').textContent = rootConcept.summary || 'Presupuesto Raíz';
+            document.getElementById('root-price').textContent = formatter.format(db.totalBudget);
+
+            // Estadísticas
+            let capCount = 0, partCount = 0;
+            Object.values(db.concepts).forEach(c => {
+                if(c.children.length > 0) capCount++; else partCount++;
+            });
+            document.getElementById('count-cap').textContent = `${capCount} capítulos`;
+            document.getElementById('count-part').textContent = `${partCount} partidas`;
+            document.getElementById('count-con').textContent = `${Object.keys(db.concepts).length} conceptos`;
+
+            // Construir nodos hijos de la raíz
+            rootConcept.children.forEach(child => {
+                treeRoot.appendChild(createTreeNode(child.concept));
+            });
+        }
+
+        function createTreeNode(concept) {
+            const li = document.createElement('li');
+            const hasChildren = concept.children.length > 0;
+            const percentage = db.totalBudget > 0 ? ((concept.price / db.totalBudget) * 100) : 0;
+            
+            const itemDiv = document.createElement('div');
+            itemDiv.className = 'tree-node-item';
+            
+            const icon = document.createElement('span');
+            icon.className = hasChildren ? 'caret' : 'node-dot';
+            
+            const content = document.createElement('div');
+            content.className = 'node-content';
+            content.innerHTML = `<span class="node-meta">${concept.code}</span><span class="node-title" title="${concept.summary}">${concept.summary}</span>`;
+            
+            itemDiv.appendChild(icon);
+            itemDiv.appendChild(content);
+
+            if (concept.price > 0) {
+                const financials = document.createElement('div');
+                financials.className = 'node-financials';
+                financials.innerHTML = `
+                    <div class="node-price">${formatter.format(concept.price)}</div>
+                    <div class="node-percentage-container">
+                        <span class="node-percentage">${percentage.toFixed(1)}%</span>
+                        <div class="node-progress-bar-bg"><div class="node-progress-bar" style="width: ${Math.min(percentage, 100)}%;"></div></div>
+                    </div>
+                `;
+                itemDiv.appendChild(financials);
+            }
+
+            li.appendChild(itemDiv);
+
+            if (hasChildren) {
+                const ul = document.createElement('ul');
+                ul.className = 'nested';
+                concept.children.forEach(child => {
+                    ul.appendChild(createTreeNode(child.concept));
+                });
+                li.appendChild(ul);
+
+                icon.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    icon.classList.toggle('caret-down');
+                    ul.classList.toggle('active');
+                });
+            }
+
+            itemDiv.addEventListener('click', (e) => {
+                e.stopPropagation();
+                document.querySelectorAll('.tree-node-item').forEach(el => el.classList.remove('selected'));
+                itemDiv.classList.add('selected');
+                showDetails(concept, percentage);
+            });
+
+            return li;
+        }
+
+        function showDetails(concept, percentage) {
+            document.getElementById('empty-state').style.display = 'none';
+            document.getElementById('details-panel').style.display = 'block';
+            
+            // Textos básicos
+            document.getElementById('det-title').textContent = concept.summary;
+            document.getElementById('det-code').textContent = concept.code;
+            document.getElementById('det-summary').textContent = concept.summary;
+            document.getElementById('det-desc').textContent = concept.description || concept.summary;
+
+            // Tarjeta de Precios
+            document.getElementById('det-price-large').textContent = formatter.format(concept.price);
+            const percText = percentage.toFixed(2).replace('.', ',') + '%';
+            document.getElementById('det-price-desc').textContent = `${percText} del presupuesto total`;
+            document.getElementById('det-progress-fill').style.width = `${Math.min(percentage, 100)}%`;
+            document.getElementById('det-progress-text').textContent = percText;
+
+            // Tabla Coeficientes (Cálculo Fijo Estándar 13% GG, 6% BI, 21% IVA)
+            const pem = concept.price;
+            const gg = pem * 0.13;
+            const bi = pem * 0.06;
+            const pec = pem + gg + bi;
+            const iva = pec * 0.21;
+            
+            document.getElementById('det-coeffs-body').innerHTML = `
+                <tr><td>Base (PEM)</td><td style="text-align: center;">—</td><td class="num">${formatter.format(pem)}</td></tr>
+                <tr><td>+ Gastos Generales (GG)</td><td style="text-align: center;">13%</td><td class="num">${formatter.format(gg)}</td></tr>
+                <tr><td>+ Beneficio Industrial (BI)</td><td style="text-align: center;">6%</td><td class="num">${formatter.format(bi)}</td></tr>
+                <tr style="background-color: #f9fafb; font-weight: 500;"><td>Presupuesto Ejecución Contrata (PEC)</td><td style="text-align: center;">—</td><td class="num">${formatter.format(pec)}</td></tr>
+                <tr><td>+ IVA</td><td style="text-align: center;">21%</td><td class="num">${formatter.format(iva)}</td></tr>
+                <tr style="font-weight: 700; color: var(--purple-box);"><td>TOTAL</td><td style="text-align: center;">—</td><td class="num">${formatter.format(pec + iva)}</td></tr>
+            `;
+
+            // Tabla Descomposición
+            const decompBody = document.getElementById('det-decomp-body');
+            const decompTable = document.getElementById('decomp-table');
+            const decompTitle = document.getElementById('decomp-title');
+            decompBody.innerHTML = '';
+
+            if (concept.children.length > 0) {
+                decompTable.style.display = 'table';
+                decompTitle.textContent = `DESCOMPOSICIÓN — ${concept.children.length} ELEMENTO(S)`;
+                
+                let totalDecomp = 0;
+                concept.children.forEach(child => {
+                    const c = child.concept;
+                    const parcial = child.factor * c.price;
+                    totalDecomp += parcial;
+                    
+                    decompBody.innerHTML += `
+                        <tr>
+                            <td class="highlight">${c.code}</td>
+                            <td>${c.summary}</td>
+                            <td style="text-align: center;">${c.unit || 'ud'}</td>
+                            <td class="num">${numFormatter.format(child.factor)}</td>
+                            <td class="num">1,000</td>
+                            <td class="num" style="font-weight: 600;">${formatter.format(parcial)}</td>
+                        </tr>
+                    `;
+                });
+                document.getElementById('det-decomp-total').textContent = formatter.format(totalDecomp);
+            } else {
+                decompTable.style.display = 'none';
+                decompTitle.textContent = 'SIN DESCOMPOSICIÓN (PARTIDA SIMPLE)';
+            }
+        }
+
+        function expandAll() {
+            document.querySelectorAll('ul.nested').forEach(ul => ul.classList.add('active'));
+            document.querySelectorAll('.caret').forEach(c => c.classList.add('caret-down'));
+        }
+
+        function collapseAll() {
+            document.querySelectorAll('ul.nested').forEach(ul => ul.classList.remove('active'));
+            document.querySelectorAll('.caret').forEach(c => c.classList.remove('caret-down'));
+        }
+    </script>
+</body>
+</html>
