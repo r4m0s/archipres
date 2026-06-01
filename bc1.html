@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Visor BC3 FIEBDC-3</title>
+    <title>Visor BC3 FIEBDC-3 (Motor Anti-Bucle)</title>
     <style>
         :root {
-            /* Paleta de colores UI Moderna y Limpia */
+            var(--bg-body): #F3F4F6;
             --bg-body: #F3F4F6;
             --bg-panel: #FFFFFF;
             --border: #E5E7EB;
@@ -30,7 +30,7 @@
             height: 100vh;
             display: flex;
             flex-direction: column;
-            overflow: hidden; /* Evita el scroll global */
+            overflow: hidden; 
         }
 
         /* CABECERA */
@@ -107,7 +107,7 @@
             border-right: 1px solid var(--border);
             display: flex;
             flex-direction: column;
-            visibility: hidden; /* Oculto hasta cargar */
+            visibility: hidden; 
             opacity: 0;
             transition: opacity 0.3s;
         }
@@ -158,12 +158,12 @@
             background: var(--bg-body);
             overflow-y: auto;
             padding: 30px;
-            display: none; /* Oculto hasta cargar */
+            display: none; 
             position: relative;
         }
         main.active { display: block; }
 
-        .back-btn { display: none; margin-bottom: 20px; } /* Solo móvil */
+        .back-btn { display: none; margin-bottom: 20px; }
 
         .detail-header { margin-bottom: 24px; }
         .detail-header h1 { font-size: 22px; color: var(--text-main); margin-bottom: 4px;}
@@ -185,14 +185,21 @@
         td.code-link { color: var(--primary); font-weight: 500;}
         tfoot tr { background: #F9FAFB; font-weight: 600; }
 
-        /* RESPONSIVE DESING (MÓVILES Y TABLETS) */
+        /* Loader Overlay */
+        #loader {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255,255,255,0.8); display: none; align-items: center; justify-content: center;
+            z-index: 100; font-size: 18px; font-weight: 600; color: var(--primary);
+        }
+
+        /* RESPONSIVE */
         @media (max-width: 900px) {
             #app-container { flex-direction: column; }
             aside { width: 100%; height: 100%; border-right: none; }
             main { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 60; display: none; }
             main.mobile-open { display: block; }
             .back-btn { display: inline-flex; }
-            .h-right button span { display: none; } /* Ocultar texto de botones en móvil */
+            .h-right button span { display: none; }
             .drop-content { margin: 20px; padding: 40px 20px; }
         }
     </style>
@@ -208,21 +215,21 @@
             <button onclick="expandAll()">▾ <span class="hide-mob">Expandir</span></button>
             <button onclick="collapseAll()">▴ <span class="hide-mob">Contraer</span></button>
             <button onclick="exportCSV()">↓ CSV</button>
-            <button onclick="alert('Función de comparación en desarrollo.')">⚖️ Comparar</button>
             <input type="file" id="fileInput" accept=".bc3" style="display: none;">
             <button class="primary" onclick="document.getElementById('fileInput').click()">Abrir BC3</button>
         </div>
     </header>
 
     <div id="app-container">
+        <div id="loader">Procesando archivo BC3...</div>
         
         <div id="drop-zone">
             <div class="drop-content">
                 <svg width="48" height="48" fill="none" stroke="#9CA3AF" stroke-width="1.5" viewBox="0 0 24 24" style="margin-bottom: 15px;">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m3.75 9v6m3-3H9m1.5-12H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"></path>
                 </svg>
-                <h2>Arrastra un archivo BC3</h2>
-                <p>o haz clic para seleccionar</p>
+                <h2>Arrastra tu archivo .bc3 aquí</h2>
+                <p>o haz clic para seleccionar (Compatible con Arquímedes y Presto)</p>
                 <button class="primary" style="margin: 0 auto;" onclick="document.getElementById('fileInput').click()">Examinar archivos</button>
             </div>
         </div>
@@ -293,60 +300,53 @@
     </div>
 
     <script>
-        // Formateadores
         const fmtMoney = new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' });
         const fmtNum = new Intl.NumberFormat('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 3 });
-
         let db = { concepts: {}, root: null, totalBudget: 0 };
 
         // ==========================================
-        // EVENTOS ARRASTRAR Y SOLTAR (DRAG & DROP)
+        // EVENTOS DRAG & DROP
         // ==========================================
         const dropZone = document.getElementById('drop-zone');
-        
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-            document.body.addEventListener(eventName, preventDefaults, false);
+            document.body.addEventListener(eventName, e => { e.preventDefault(); e.stopPropagation(); }, false);
         });
-
-        function preventDefaults(e) { e.preventDefault(); e.stopPropagation(); }
-
-        ['dragenter', 'dragover'].forEach(eventName => {
-            dropZone.addEventListener(eventName, () => dropZone.classList.add('dragover'), false);
-        });
-
-        ['dragleave', 'drop'].forEach(eventName => {
-            dropZone.addEventListener(eventName, () => dropZone.classList.remove('dragover'), false);
-        });
+        ['dragenter', 'dragover'].forEach(eventName => dropZone.addEventListener(eventName, () => dropZone.classList.add('dragover'), false));
+        ['dragleave', 'drop'].forEach(eventName => dropZone.addEventListener(eventName, () => dropZone.classList.remove('dragover'), false));
 
         dropZone.addEventListener('drop', (e) => {
-            let dt = e.dataTransfer;
-            let files = dt.files;
-            if (files.length) handleFile(files[0]);
+            if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
         });
-
         document.getElementById('fileInput').addEventListener('change', function(e) {
             if (e.target.files.length) handleFile(e.target.files[0]);
         });
 
         function handleFile(file) {
-            if (!file.name.toLowerCase().endsWith('.bc3')) {
-                alert("Por favor, selecciona un archivo válido con extensión .bc3");
-                return;
-            }
+            if (!file.name.toLowerCase().endsWith('.bc3')) return alert("Selecciona un archivo .bc3");
+            
             document.getElementById('header-filename').textContent = file.name;
+            document.getElementById('loader').style.display = 'flex';
+            
             const reader = new FileReader();
-            reader.readAsText(file, 'windows-1252'); // Codificación estándar en España
+            reader.readAsText(file, 'windows-1252'); 
+            
             reader.onload = function(e) {
-                dropZone.style.display = 'none'; // Ocultar drag & drop
-                document.getElementById('sidebar').classList.add('active');
-                document.getElementById('main-panel').classList.add('active');
-                parseBC3(e.target.result);
-                renderTree();
+                // Pequeño timeout para permitir que la UI pinte el "Cargando..."
+                setTimeout(() => {
+                    dropZone.style.display = 'none';
+                    document.getElementById('sidebar').classList.add('active');
+                    document.getElementById('main-panel').classList.add('active');
+                    
+                    parseBC3(e.target.result);
+                    renderTree();
+                    
+                    document.getElementById('loader').style.display = 'none';
+                }, 50);
             };
         }
 
         // ==========================================
-        // MOTOR DE PARSEO BC3 (Tolerante a desorden)
+        // PARSER FIEBDC-3 (NUEVO MOTOR)
         // ==========================================
         function parseBC3(content) {
             db.concepts = {}; db.root = null; db.totalBudget = 0;
@@ -359,26 +359,29 @@
                 return db.concepts[code];
             };
 
-            content = content.replace(/^\uFEFF/, '');
-            const lines = content.split(/\r?\n/);
+            // Limpieza agresiva de caracteres invisibles y saltos de carro conflictivos (\r)
+            content = content.replace(/^\uFEFF/, '').replace(/\r/g, '');
+            const lines = content.split('\n');
             const records = [];
             let currentRecord = "";
             
             for (let i = 0; i < lines.length; i++) {
                 let line = lines[i];
                 if (line.trim() === '') continue;
-                if (line.trimStart().startsWith('~')) {
+                
+                // Detecta inicio de registro BC3 (Ej: ~C| o ~D|)
+                if (/^~[a-zA-Z0-9@](\||$)/.test(line.trimStart())) {
                     if (currentRecord) records.push(currentRecord);
                     currentRecord = line.trimStart();
                 } else if (currentRecord) {
-                    currentRecord += line; // Empalmar líneas cortadas
+                    currentRecord += line; 
                 }
             }
             if (currentRecord) records.push(currentRecord);
 
             records.forEach(record => {
                 const parts = record.split('|');
-                const type = parts[0].trim();
+                const type = parts[0].trim().toUpperCase();
 
                 if (type === '~C') {
                     let code = parts[1] ? parts[1].trim() : null; 
@@ -386,7 +389,7 @@
                     let concept = getConcept(code);
                     concept.unit = parts[2] ? parts[2].trim() : concept.unit;
                     concept.summary = parts[3] ? parts[3].trim() : concept.summary;
-                    concept.price = parseFloat((parts[4] || '0').replace(',', '.')) || concept.price;
+                    concept.price = parseFloat((parts[4] || '0').replace(',', '.')) || concept.price || 0;
                 } 
                 else if (type === '~D') {
                     let parentCode = parts[1] ? parts[1].trim() : null;
@@ -411,33 +414,67 @@
                 }
             });
 
-            // Encontrar Raíz (el de mayor precio que no sea hijo)
+            // Lógica de detección de Raíz mejorada
             const possibleRoots = Object.keys(db.concepts).filter(k => db.concepts[k].children.length > 0 && !isChild.has(k));
-            if (possibleRoots.length > 0) {
+            
+            if (possibleRoots.length === 1) {
+                db.root = possibleRoots[0];
+            } else if (possibleRoots.length > 1) {
                 db.root = possibleRoots.reduce((a, b) => (db.concepts[a].price > db.concepts[b].price) ? a : b);
-            } else if (Object.keys(db.concepts).length > 0) {
-                db.root = Object.keys(db.concepts)[0];
+            } else {
+                // Fallback de seguridad si el archivo está roto
+                const fallback = Object.keys(db.concepts).find(k => db.concepts[k].children.length > 0);
+                db.root = fallback || Object.keys(db.concepts)[0];
             }
             db.totalBudget = db.root ? db.concepts[db.root].price : 0;
         }
 
         // ==========================================
-        // RENDERIZADO VISUAL
+        // RENDERIZADO VISUAL (CON PROTECCIÓN ANTI-BUCLES)
         // ==========================================
         function renderTree() {
             const rootEl = document.getElementById('tree-root');
             rootEl.innerHTML = '';
             
-            if (!db.root) return;
+            if (!db.root) {
+                rootEl.innerHTML = '<li style="padding: 20px; color: red;">Error: Archivo sin estructura reconocible.</li>';
+                return;
+            }
+
             const rootConcept = db.concepts[db.root];
+            // Usamos un DocumentFragment para mayor velocidad de renderizado en archivos grandes
+            const fragment = document.createDocumentFragment();
+            
+            // Creamos un registro de nodos visitados para evitar el bucle infinito
+            const visited = new Set([rootConcept.code]);
 
             rootConcept.children.forEach(child => {
-                rootEl.appendChild(createTreeNode(child.concept));
+                fragment.appendChild(createTreeNode(child.concept, visited));
             });
+            
+            rootEl.appendChild(fragment);
         }
 
-        function createTreeNode(concept) {
+        function createTreeNode(concept, visited) {
             const li = document.createElement('li');
+            
+            // PROTECCIÓN CONTRA REFERENCIAS CIRCULARES
+            if (visited.has(concept.code)) {
+                li.innerHTML = `
+                    <div class="tree-node">
+                        <span class="dot"></span>
+                        <div class="node-info">
+                            <div class="node-code">${concept.code}</div>
+                            <div class="node-text" style="color: #ef4444;" title="Referencia circular omitida">⚠️ Bucle detectado: ${concept.summary}</div>
+                        </div>
+                    </div>`;
+                return li;
+            }
+
+            // Clonamos el set para pasarlo a los hijos (permite usar el mismo material en ramas distintas)
+            const newVisited = new Set(visited);
+            newVisited.add(concept.code);
+
             const hasChildren = concept.children.length > 0;
             
             const nodeDiv = document.createElement('div');
@@ -462,7 +499,7 @@
             if (hasChildren) {
                 const ul = document.createElement('ul');
                 ul.className = 'nested';
-                concept.children.forEach(child => ul.appendChild(createTreeNode(child.concept)));
+                concept.children.forEach(child => ul.appendChild(createTreeNode(child.concept, newVisited)));
                 li.appendChild(ul);
 
                 icon.addEventListener('click', (e) => {
@@ -478,7 +515,6 @@
                 nodeDiv.classList.add('selected');
                 showDetails(concept);
                 
-                // Lógica Responsive: Abrir panel derecho en móviles
                 if(window.innerWidth <= 900) {
                     document.getElementById('main-panel').classList.add('mobile-open');
                 }
@@ -523,9 +559,6 @@
             }
         }
 
-        // ==========================================
-        // FUNCIONES AUXILIARES (UI y Exportación)
-        // ==========================================
         function expandAll() {
             document.querySelectorAll('ul.nested').forEach(ul => ul.classList.add('active-tree'));
             document.querySelectorAll('.caret').forEach(c => c.classList.add('caret-down'));
