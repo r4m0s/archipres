@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Visor BC3 Profesional - Motor de Lectura Fijo</title>
+    <title>Visor BC3 Profesional - Árbol Definitivo</title>
     <style>
         :root {
             --bg-page: #F3F4F6;
@@ -263,7 +263,7 @@
                             </tr>
                         </thead>
                         <tbody id="det-coeffs-body">
-                            </tbody>
+                        </tbody>
                     </table>
 
                     <h3 id="decomp-title">DESCOMPOSICIÓN</h3>
@@ -279,7 +279,7 @@
                             </tr>
                         </thead>
                         <tbody id="det-decomp-body">
-                            </tbody>
+                        </tbody>
                         <tfoot>
                             <tr>
                                 <td colspan="5">Total descomposición</td>
@@ -311,7 +311,7 @@
         });
 
         // ==========================================
-        // MOTOR DE PARSEO BC3 MEJORADO (FIEBDC-3)
+        // MOTOR FIEBDC-3 (TOLERANTE A DESORDEN)
         // ==========================================
         function parseBC3(content) {
             db.concepts = {};
@@ -319,106 +319,106 @@
             db.totalBudget = 0;
             const isChild = new Set();
             
-            // 1. Limpieza de BOM
+            // Función vital: Si un código no existe aún, se pre-crea en memoria.
+            const getConcept = (code) => {
+                if (!db.concepts[code]) {
+                    db.concepts[code] = { code: code, unit: '', summary: code, price: 0, children: [], description: '' };
+                }
+                return db.concepts[code];
+            };
+
             content = content.replace(/^\uFEFF/, '');
             
-            // 2. Agrupar líneas manejando saltos de carro en descripciones
+            // Agrupar líneas cortadas por Arquímedes/Presto
             const lines = content.split(/\r?\n/);
             const records = [];
             let currentRecord = "";
             
             for (let i = 0; i < lines.length; i++) {
                 let line = lines[i];
-                // Los registros estándar FIEBDC empiezan siempre con ~ seguido de una letra
-                if (/^~[a-zA-Z0-9@]/.test(line)) {
+                if (line.trim() === '') continue; // Ignorar líneas en blanco
+                
+                // Si la línea empieza por ~, es un nuevo registro
+                if (line.trimStart().startsWith('~')) {
                     if (currentRecord) records.push(currentRecord);
-                    currentRecord = line;
+                    currentRecord = line.trimStart();
                 } else if (currentRecord) {
-                    currentRecord += "\n" + line; // Es continuación de texto
+                    // Empalmar texto si la línea ha sido cortada
+                    currentRecord += line; 
                 }
             }
             if (currentRecord) records.push(currentRecord);
 
-            // 3. PASADA 1: Extraer conceptos (~C) y Textos (~T)
+            // Leer todos los registros sin importar el orden
             records.forEach(record => {
                 const parts = record.split('|');
-                const type = parts[0];
+                const type = parts[0].trim();
 
                 if (type === '~C') {
-                    // ¡CRÍTICO!: No usar .trim() en el código. FIEBDC distingue "01.01" de "01.01 "
-                    const code = parts[1]; 
+                    let code = parts[1]; 
                     if (!code) return;
+                    code = code.trim();
                     
-                    db.concepts[code] = {
-                        code: code,
-                        unit: parts[2] || '',
-                        summary: parts[3] || '',
-                        price: parseFloat((parts[4] || '0').replace(',', '.')) || 0,
-                        children: [],
-                        description: ''
-                    };
+                    let concept = getConcept(code); // Pre-crea o recupera
+                    concept.unit = parts[2] ? parts[2].trim() : concept.unit;
+                    concept.summary = parts[3] ? parts[3].trim() : concept.summary;
+                    concept.price = parseFloat((parts[4] || '0').replace(',', '.')) || concept.price;
                 } 
-                else if (type === '~T') {
-                    const code = parts[1];
-                    if (code && db.concepts[code]) {
-                        db.concepts[code].description = (parts[2] || '').replace(/\\n/g, '\n');
-                    }
-                }
-            });
-
-            // 4. PASADA 2: Estructurar la jerarquía en orden estricto (~D)
-            records.forEach(record => {
-                const parts = record.split('|');
-                const type = parts[0];
-                
-                if (type === '~D') {
-                    const parentCode = parts[1];
-                    if (!parentCode || !db.concepts[parentCode]) return;
+                else if (type === '~D') {
+                    let parentCode = parts[1];
+                    if (!parentCode) return;
+                    parentCode = parentCode.trim();
+                    
+                    let parent = getConcept(parentCode); // Pre-crea el padre si no existía
                     
                     let childrenString = parts[2] || '';
-                    if (childrenString.endsWith('\\')) childrenString = childrenString.slice(0, -1);
-                    
                     const childrenData = childrenString.split('\\');
                     
-                    // El orden del archivo .bc3 define el orden visual final.
                     for (let i = 0; i < childrenData.length; i += 2) {
-                        const childCode = childrenData[i];
-                        const factorStr = childrenData[i+1] || '1';
-                        const factor = parseFloat(factorStr.replace(',', '.')) || 0;
+                        let childCode = childrenData[i];
+                        if (!childCode || childCode.trim() === '') continue;
+                        childCode = childCode.trim();
                         
-                        if (childCode && db.concepts[childCode]) {
-                            db.concepts[parentCode].children.push({
-                                concept: db.concepts[childCode],
-                                factor: factor
-                            });
-                            isChild.add(childCode);
+                        let factorStr = childrenData[i+1];
+                        let factor = 1;
+                        if (factorStr && factorStr.trim() !== '') {
+                            factor = parseFloat(factorStr.replace(',', '.')) || 0;
                         }
+                        
+                        let child = getConcept(childCode); // Pre-crea el hijo si no existía
+                        parent.children.push({ concept: child, factor: factor });
+                        isChild.add(childCode);
                     }
+                }
+                else if (type === '~T') {
+                    let code = parts[1];
+                    if (!code) return;
+                    code = code.trim();
+                    let concept = getConcept(code);
+                    concept.description = (parts[2] || '').replace(/\\n/gi, '\n');
                 }
             });
 
-            // 5. Detectar la raíz del presupuesto
+            // Detectar la raíz lógica (El nodo superior que no es hijo de nadie)
             const possibleRoots = [];
             for (const code in db.concepts) {
-                // Es raíz si tiene componentes hijos pero NUNCA es hijo de nadie
                 if (db.concepts[code].children.length > 0 && !isChild.has(code)) {
                     possibleRoots.push(db.concepts[code]);
                 }
             }
 
             if (possibleRoots.length > 0) {
-                // A veces hay varias raíces (ej. bases de precios importadas), nos quedamos con el presupuesto (la de mayor importe)
                 const mainRoot = possibleRoots.reduce((prev, curr) => (curr.price > prev.price) ? curr : prev);
                 db.root = mainRoot.code;
-            } else {
-                db.root = Object.keys(db.concepts)[0] || null;
+            } else if (Object.keys(db.concepts).length > 0) {
+                db.root = Object.keys(db.concepts)[0];
             }
 
             db.totalBudget = db.root ? db.concepts[db.root].price : 0;
         }
 
         // ==========================================
-        // RENDERIZADO VISUAL
+        // RENDERIZADO DEL ÁRBOL
         // ==========================================
         function renderTree() {
             const treeRoot = document.getElementById('tree-root');
@@ -428,7 +428,7 @@
             document.getElementById('searchInput').disabled = false;
             
             if (!db.root || !db.concepts[db.root]) {
-                treeRoot.innerHTML = '<li style="padding: 20px; color: red;">Error al procesar el archivo.</li>';
+                treeRoot.innerHTML = '<li style="padding: 20px; color: red;">Error al procesar el archivo. Formato no válido.</li>';
                 return;
             }
 
@@ -437,7 +437,6 @@
             document.getElementById('root-title').textContent = rootConcept.summary || 'Presupuesto Principal';
             document.getElementById('root-price').textContent = formatter.format(db.totalBudget);
 
-            // Estadísticas
             let capCount = 0, partCount = 0;
             Object.values(db.concepts).forEach(c => {
                 if(c.children.length > 0) capCount++; else partCount++;
@@ -446,7 +445,7 @@
             document.getElementById('count-part').textContent = `${partCount} partidas`;
             document.getElementById('count-con').textContent = `${Object.keys(db.concepts).length} conceptos`;
 
-            // Construir nodos hijos iterando en el orden exacto dictado por el array
+            // Renderiza todos los capítulos hijos colgando directamente de la raíz principal
             rootConcept.children.forEach(child => {
                 treeRoot.appendChild(createTreeNode(child.concept));
             });
@@ -470,7 +469,7 @@
             itemDiv.appendChild(icon);
             itemDiv.appendChild(content);
 
-            if (concept.price > 0) {
+            if (concept.price > 0 || percentage > 0) {
                 const financials = document.createElement('div');
                 financials.className = 'node-financials';
                 financials.innerHTML = `
@@ -485,6 +484,7 @@
 
             li.appendChild(itemDiv);
 
+            // Llamada recursiva para subcapítulos y partidas
             if (hasChildren) {
                 const ul = document.createElement('ul');
                 ul.className = 'nested';
@@ -493,6 +493,7 @@
                 });
                 li.appendChild(ul);
 
+                // Función desplegable
                 icon.addEventListener('click', (e) => {
                     e.stopPropagation();
                     icon.classList.toggle('caret-down');
@@ -500,6 +501,7 @@
                 });
             }
 
+            // Click para ver los detalles
             itemDiv.addEventListener('click', (e) => {
                 e.stopPropagation();
                 document.querySelectorAll('.tree-node-item').forEach(el => el.classList.remove('selected'));
