@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visor FIEBDC-3 (BC3) - Funcional y Estable</title>
+    <style>
+        :root {
+            --primary: #0056b3;
+            --bg-body: #f4f7f6;
+            --bg-card: #ffffff;
+            --border: #d1d5db;
+            --text-main: #333333;
+            --text-muted: #666666;
+            --chapter-bg: #e2e8f0;
+            --item-bg: #ffffff;
+            --hover-bg: #f0f9ff;
+            
+            /* Anchos de columna fijos */
+            --col-icon: 24px;
+            --col-code: 120px;
+            --col-desc: auto;
+            --col-unit: 60px;
+            --col-qty: 90px;
+            --col-price: 100px;
+            --col-amount: 110px;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            margin: 0;
+            padding: 1rem;
+        }
+
+        .main-container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem;
+            background: var(--bg-card);
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            margin-bottom: 1rem;
+        }
+
+        .upload-zone {
+            border: 3px dashed var(--border);
+            padding: 3rem;
+            text-align: center;
+            border-radius: 8px;
+            background: var(--bg-card);
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .upload-zone:hover {
+            border-color: var(--primary);
+            background: #fdfdfd;
+        }
+
+        #viewer-container {
+            display: none;
+            background: var(--bg-card);
+            padding: 1rem;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .bc3-tree {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+
+        .tree-header {
+            display: grid;
+            grid-template-columns: var(--col-icon) var(--col-code) var(--col-desc) var(--col-unit) var(--col-qty) var(--col-price) var(--col-amount);
+            font-weight: bold;
+            background-color: #f8fafc;
+            border: 1px solid var(--border);
+            padding: 0.75rem 0.5rem;
+            border-radius: 4px;
+            margin-bottom: 0.5rem;
+            gap: 5px;
+        }
+
+        .tree-header span { text-align: center; }
+        .tree-header .col-desc { text-align: left; }
+        .tree-header .col-price, .tree-header .col-amount { text-align: right; }
+
+        details { border: 1px solid transparent; }
+
+        summary {
+            display: grid;
+            grid-template-columns: var(--col-icon) var(--col-code) var(--col-desc) var(--col-unit) var(--col-qty) var(--col-price) var(--col-amount);
+            align-items: center;
+            padding: 0.5rem;
+            cursor: pointer;
+            list-style: none;
+            gap: 5px;
+            border-bottom: 1px solid #edf2f7;
+        }
+
+        summary:hover { background-color: var(--hover-bg); }
+        summary::-webkit-details-marker { display: none; }
+
+        .col { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 4px; }
+        .col-code { font-family: monospace; color: var(--primary); }
+        .col-qty, .col-price, .col-amount { text-align: right; font-weight: 600; }
+        .col-unit { text-align: center; color: var(--text-muted); }
+
+        .node-icon { text-align: center; width: var(--col-icon); }
+        details > summary .node-icon::before { content: "▸"; color: var(--text-muted); }
+        details[open] > summary .node-icon::before { content: "▾"; }
+
+        .node-chapter > summary {
+            background-color: var(--chapter-bg);
+            font-weight: bold;
+            border-bottom: 1px solid var(--border);
+        }
+        .node-chapter > details { margin-left: 1.2rem; border-left: 1px solid var(--border); }
+
+        .node-item > summary { background-color: var(--item-bg); }
+        .node-item > summary .node-icon::before { content: "•"; color: var(--primary); }
+
+        .item-details-panel {
+            background-color: #f9fafb;
+            padding: 1rem;
+            margin-left: 2rem;
+            border: 1px solid #e5e7eb;
+            border-radius: 4px;
+            margin-bottom: 0.5rem;
+        }
+
+        .detail-section { margin-bottom: 1rem; }
+        .detail-header {
+            font-weight: bold;
+            color: var(--primary);
+            border-bottom: 2px solid #e2e8f0;
+            padding-bottom: 0.25rem;
+            margin-bottom: 0.5rem;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+        }
+
+        .long-description {
+            font-size: 0.85rem;
+            line-height: 1.5;
+            color: #4a5568;
+            white-space: pre-wrap;
+        }
+
+        .measurements-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.8rem;
+        }
+        .measurements-table th { background: #edf2f7; text-align: left; padding: 4px; border: 1px solid #dadada; }
+        .measurements-table td { padding: 4px; border: 1px solid #dadada; }
+        .measurements-table .num { text-align: right; width: 60px; }
+        .measurements-table .total { font-weight: bold; background: #fff; }
+
+        .item-leaf-marker summary { pointer-events: none; }
+        .item-leaf-marker summary .node-icon::before { content: " " !important;}
+
+    </style>
+</head>
+<body>
+
+    <div class="main-container">
+        <header>
+            <h2>Visualizador FIEBDC-3 (.bc3) Profesional</h2>
+            <button onclick="location.reload()" style="padding: 8px 16px; background: var(--primary); color: white; border: none; border-radius: 4px; cursor: pointer;">Cargar otro archivo</button>
+        </header>
+
+        <div class="upload-zone" id="drop-zone">
+            <h3>Arrastra tu archivo .bc3 aquí</h3>
+            <p>o haz clic para buscar en tu ordenador</p>
+            <input type="file" id="file-input" accept=".bc3" style="display: none;">
+        </div>
+
+        <div id="viewer-container">
+            <div class="tree-header">
+                <span class="col-icon"></span>
+                <span class="col-code">Código</span>
+                <span class="col-desc">Descripción</span>
+                <span class="col-unit">Ud</span>
+                <span class="col-qty">Cant.</span>
+                <span class="col-price">Precio (€)</span>
+                <span class="col-amount">Importe (€)</span>
+            </div>
+            <div id="tree-root"></div>
+        </div>
+    </div>
+
+    <script>
+        const fileInput = document.getElementById('file-input');
+        const dropZone = document.getElementById('drop-zone');
+        const viewerContainer = document.getElementById('viewer-container');
+        const treeRoot = document.getElementById('tree-root');
+
+        const formatEuro = new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' });
+        const formatNumber = new Intl.NumberFormat('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 3 });
+
+        dropZone.addEventListener('click', () => fileInput.click());
+        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.style.borderColor = '#0056b3'; });
+        dropZone.addEventListener('dragleave', () => dropZone.style.borderColor = '#d1d5db');
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.style.borderColor = '#d1d5db';
+            if (e.dataTransfer.files.length) procesarArchivo(e.dataTransfer.files[0]);
+        });
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length) procesarArchivo(e.target.files[0]);
+        });
+
+        function procesarArchivo(file) {
+            const reader = new FileReader();
+            reader.readAsText(file, 'ISO-8859-1'); 
+            reader.onload = (e) => {
+                try {
+                    const data = parsearBC3Seguro(e.target.result);
+                    renderizarArbolProfesional(data);
+                    dropZone.style.display = 'none';
+                    viewerContainer.style.display = 'block';
+                } catch (err) {
+                    alert("Error renderizando el archivo. Revisa la consola para más detalles.");
+                    console.error("Fallo crítico:", err);
+                }
+            };
+        }
+
+        // --- PARSER TÓLERANTE A FALLOS ---
+        function parsearBC3Seguro(contenido) {
+            // Eliminar uniones de línea con barra invertida (formato BC3 multilinea)
+            const textoUnido = contenido.replace(/\\\r?\n/g, '');
+            // Separar estrictamente por el símbolo de registro '~'
+            const registros = textoUnido.split('~');
+
+            const conceptos = {};
+            const jerarquia = {};
+            const mediciones = {};
+            const textosLargos = {};
+            const hijosSet = new Set();
+
+            registros.forEach(registro => {
+                if (!registro || registro.trim() === '') return;
+                
+                const tipo = registro.charAt(0);
+                const dataStr = registro.substring(1);
+                const campos = dataStr.split('|');
+
+                try {
+                    if (tipo === 'C') {
+                        conceptos[campos[0]] = {
+                            codigo: campos[0],
+                            unidad: campos[1] || '',
+                            resumen: campos[2] || '',
+                            precio: parseFloat((campos[3] || '0').replace(',', '.')) || 0
+                        };
+                    } 
+                    else if (tipo === 'D') {
+                        const padre = campos[0];
+                        if (!jerarquia[padre]) jerarquia[padre] = [];
+                        
+                        for (let i = 1; i < campos.length; i++) {
+                            if (campos[i]) {
+                                const datosHijo = campos[i].split('\\');
+                                const codigoHijo = datosHijo[0];
+                                if (codigoHijo) {
+                                    jerarquia[padre].push({
+                                        codigo: codigoHijo,
+                                        rendimiento: parseFloat((datosHijo[1] || '1').replace(',', '.')) || 1
+                                    });
+                                    hijosSet.add(codigoHijo);
+                                }
+                            }
+                        }
+                    }
+                    else if (tipo === 'T') {
+                        textosLargos[campos[0]] = campos[1] || '';
+                    }
+                    else if (tipo === 'M') {
+                        const codigo = campos[0];
+                        if (!mediciones[codigo]) mediciones[codigo] = [];
+
+                        for (let i = 3; i < campos.length; i++) {
+                            if (campos[i] && campos[i].trim() !== '') {
+                                const cota = campos[i].split('\\');
+                                mediciones[codigo].push({
+                                    comentario: cota[0] || '',
+                                    u: cota[1] ? parseFloat(cota[1].replace(',', '.')) || 1 : 1,
+                                    l: cota[2] ? parseFloat(cota[2].replace(',', '.')) || 1 : 1,
+                                    a: cota[3] ? parseFloat(cota[3].replace(',', '.')) || 1 : 1,
+                                    h: cota[4] ? parseFloat(cota[4].replace(',', '.')) || 1 : 1
+                                });
+                            }
+                        }
+                    }
+                } catch(e) {
+                    console.warn("Se ignoró un registro por formato inesperado:", registro);
+                }
+            });
+
+            // Encontrar nodo(s) raíz seguros
+            let nodosRaiz = [];
+            for (const padre in jerarquia) {
+                if (!hijosSet.has(padre)) nodosRaiz.push(padre);
+            }
+
+            if (nodosRaiz.length === 0) {
+                // Si la jerarquía es extraña, muestra los conceptos que no son hijos de nadie
+                nodosRaiz = Object.keys(conceptos).filter(c => !hijosSet.has(c));
+            }
+
+            return { conceptos, jerarquia, mediciones, textosLargos, nodosRaiz };
+        }
+
+        // --- RENDERIZADO VISUAL PROFESIONAL ---
+        function renderizarArbolProfesional(data) {
+            treeRoot.innerHTML = '';
+
+            function crearNodoDOM(codigo, rendimientoPadre = 1) {
+                const concepto = data.conceptos[codigo];
+                if (!concepto) return null;
+
+                const hijos = data.jerarquia[codigo] || [];
+                const esCapitulo = hijos.length > 0;
+                
+                let cantidad, importe;
+                if (esCapitulo) {
+                    // VARIABLE CORREGIDA: rendimientoPadre en lugar del typo anterior
+                    cantidad = rendimientoPadre; 
+                    importe = concepto.precio; 
+                } else {
+                    cantidad = rendimientoPadre; 
+                    importe = cantidad * concepto.precio;
+                }
+
+                const details = document.createElement('details');
+                details.classList.add(esCapitulo ? 'node-chapter' : 'node-item');
+
+                if (data.nodosRaiz.includes(codigo)) details.open = true;
+
+                const summary = document.createElement('summary');
+                summary.innerHTML = `
+                    <span class="node-icon col"></span>
+                    <span class="col-code col" title="${concepto.codigo}">${concepto.codigo}</span>
+                    <span class="col-desc col" title="${concepto.resumen}">${concepto.resumen}</span>
+                    <span class="col-unit col">${concepto.unidad}</span>
+                    <span class="col-qty col">${esCapitulo ? '' : formatNumber.format(cantidad)}</span>
+                    <span class="col-price col">${esCapitulo ? '' : formatEuro.format(concepto.precio)}</span>
+                    <span class="col-amount col">${formatEuro.format(importe)}</span>
+                `;
+                details.appendChild(summary);
+
+                if (esCapitulo) {
+                    hijos.forEach(hijoData => {
+                        const subNodo = crearNodoDOM(hijoData.codigo, hijoData.rendimiento);
+                        if (subNodo) details.appendChild(subNodo);
+                    });
+                } else {
+                    details.classList.add('item-leaf-marker'); 
+                    
+                    const panel = document.createElement('div');
+                    panel.classList.add('item-details-panel');
+
+                    if (data.textosLargos[codigo]) {
+                        panel.innerHTML += `
+                            <div class="detail-section">
+                                <div class="detail-header">Descripción Técnica</div>
+                                <div class="long-description">${data.textosLargos[codigo]}</div>
+                            </div>
+                        `;
+                    }
+
+                    if (data.mediciones[codigo] && data.mediciones[codigo].length > 0) {
+                        let htmlM = `
+                            <div class="detail-section">
+                                <div class="detail-header">Líneas de Medición</div>
+                                <table class="measurements-table">
+                                    <thead><tr><th>Comentario</th><th>Uds</th><th>Long</th><th>Anch</th><th>Alt</th><th>Total</th></tr></thead>
+                                    <tbody>
+                        `;
+                        
+                        let totalCalculado = 0;
+                        data.mediciones[codigo].forEach(m => {
+                            const subtotal = m.u * m.l * m.a * m.h;
+                            totalCalculado += subtotal;
+                            htmlM += `
+                                <tr>
+                                    <td>${m.comentario}</td>
+                                    <td class="num">${m.u !== 1 ? m.u : ''}</td>
+                                    <td class="num">${m.l !== 1 ? m.l : ''}</td>
+                                    <td class="num">${m.a !== 1 ? m.a : ''}</td>
+                                    <td class="num">${m.h !== 1 ? m.h : ''}</td>
+                                    <td class="num total">${subtotal.toFixed(3)}</td>
+                                </tr>
+                            `;
+                        });
+                        
+                        htmlM += `</tbody></table></div>`;
+                        panel.innerHTML += htmlM;
+                    }
+
+                    if(panel.children.length > 0) {
+                        details.appendChild(panel);
+                        summary.style.pointerEvents = 'auto'; 
+                        details.classList.remove('item-leaf-marker');
+                    }
+                }
+
+                return details;
+            }
+
+            data.nodosRaiz.forEach(raizCodigo => {
+                const domRaiz = crearNodoDOM(raizCodigo);
+                if (domRaiz) treeRoot.appendChild(domRaiz);
+            });
+        }
+    </script>
+</body>
+</html>
