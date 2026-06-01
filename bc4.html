@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visor BC3 - Primera Versión</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --bg-body: #f3f4f6;
+            --bg-card: #ffffff;
+            --border: #e5e7eb;
+            --text-main: #1f2937;
+            --text-muted: #6b7280;
+        }
+
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            margin: 0;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: var(--bg-card);
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid var(--border);
+            padding-bottom: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .upload-area {
+            border: 2px dashed var(--border);
+            padding: 2rem;
+            text-align: center;
+            border-radius: 8px;
+            background: #f9fafb;
+            cursor: pointer;
+            transition: border-color 0.3s;
+        }
+
+        .upload-area:hover {
+            border-color: var(--primary);
+        }
+
+        /* Estilos del Árbol */
+        .tree-container {
+            margin-top: 1rem;
+        }
+
+        details {
+            margin-left: 1.5rem;
+        }
+
+        /* Ocultar el marcador nativo del details y crear un diseño flex */
+        summary {
+            display: flex;
+            align-items: center;
+            padding: 0.5rem;
+            cursor: pointer;
+            border-bottom: 1px solid var(--border);
+            list-style: none;
+            gap: 1rem;
+        }
+
+        summary::-webkit-details-marker {
+            display: none;
+        }
+
+        summary:hover {
+            background-color: #f8fafc;
+        }
+
+        .item-icon {
+            font-size: 0.8rem;
+            width: 15px;
+            color: var(--text-muted);
+        }
+
+        details[open] > summary .item-icon::before {
+            content: "▼";
+        }
+        
+        details:not([open]) > summary .item-icon::before {
+            content: "▶";
+        }
+
+        /* Hoja final (partida sin hijos) */
+        .is-leaf > summary .item-icon::before {
+            content: "•";
+            color: var(--primary);
+        }
+
+        .item-code {
+            font-weight: 600;
+            color: var(--primary);
+            min-width: 120px;
+        }
+
+        .item-desc {
+            flex-grow: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .item-unit {
+            color: var(--text-muted);
+            min-width: 50px;
+            text-align: center;
+        }
+
+        .item-price {
+            font-weight: 600;
+            min-width: 100px;
+            text-align: right;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <header>
+            <h2>Visor FIEBDC-3 (.bc3)</h2>
+        </header>
+
+        <div class="upload-area" id="drop-zone">
+            <p>Arrastra un archivo BC3 aquí o haz clic para seleccionar</p>
+            <input type="file" id="file-input" accept=".bc3" style="display: none;">
+        </div>
+
+        <div class="tree-container" id="tree-root">
+            </div>
+    </div>
+
+    <script>
+        const fileInput = document.getElementById('file-input');
+        const dropZone = document.getElementById('drop-zone');
+        const treeRoot = document.getElementById('tree-root');
+
+        // Eventos de carga de archivo
+        dropZone.addEventListener('click', () => fileInput.click());
+        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.style.borderColor = '#2563eb'; });
+        dropZone.addEventListener('dragleave', () => dropZone.style.borderColor = '#e5e7eb');
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.style.borderColor = '#e5e7eb';
+            if (e.dataTransfer.files.length) procesarArchivo(e.dataTransfer.files[0]);
+        });
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length) procesarArchivo(e.target.files[0]);
+        });
+
+        function procesarArchivo(file) {
+            const reader = new FileReader();
+            // Los archivos BC3 en España suelen usar codificación ISO-8859-1 (ANSI)
+            reader.readAsText(file, 'ISO-8859-1');
+            reader.onload = (e) => {
+                const data = parsearBC3(e.target.result);
+                renderizarArbol(data);
+                dropZone.style.display = 'none'; // Ocultar zona de carga tras el éxito
+            };
+        }
+
+        function parsearBC3(contenido) {
+            // Eliminar saltos de línea para evitar problemas con registros divididos
+            const textoLimpio = contenido.replace(/\r\n|\r|\n/g, '');
+            // Dividir por el carácter '~' para aislar cada registro
+            const registros = textoLimpio.split('~');
+
+            const conceptos = {};
+            const jerarquia = {};
+            const hijosSet = new Set(); // Para saber qué nodos son hijos y encontrar la raíz absoluta
+
+            registros.forEach(registro => {
+                if (!registro) return;
+                
+                const tipo = registro.charAt(0);
+                const campos = registro.substring(1).split('|');
+
+                // Registro ~C: Concepto (Capítulo, Partida o Simple)
+                if (tipo === 'C') {
+                    conceptos[campos[1]] = {
+                        codigo: campos[1],
+                        unidad: campos[2],
+                        resumen: campos[3],
+                        precio: parseFloat(campos[4].replace(',', '.')) || 0
+                    };
+                } 
+                // Registro ~D: Descomposición (Relación Padre -> Hijos)
+                else if (tipo === 'D') {
+                    const padre = campos[1];
+                    jerarquia[padre] = [];
+                    
+                    // A partir del índice 2 están los hijos. En FIEBDC-3 se separan subcampos por '\'
+                    for (let i = 2; i < campos.length; i++) {
+                        if (campos[i]) {
+                            const datosHijo = campos[i].split('\\');
+                            const codigoHijo = datosHijo[0];
+                            jerarquia[padre].push(codigoHijo);
+                            hijosSet.add(codigoHijo);
+                        }
+                    }
+                }
+            });
+
+            // Encontrar la raíz (el nodo que es padre pero nunca aparece como hijo)
+            let nodoRaiz = null;
+            for (const padre in jerarquia) {
+                if (!hijosSet.has(padre)) {
+                    nodoRaiz = padre;
+                    break;
+                }
+            }
+
+            return { conceptos, jerarquia, nodoRaiz };
+        }
+
+        function renderizarArbol(data) {
+            treeRoot.innerHTML = ''; // Limpiar árbol anterior
+
+            function crearNodo(codigo) {
+                const concepto = data.conceptos[codigo];
+                if (!concepto) return null;
+
+                const hijos = data.jerarquia[codigo] || [];
+                const esHoja = hijos.length === 0;
+
+                // Crear contenedor <details>
+                const details = document.createElement('details');
+                if (esHoja) {
+                    details.classList.add('is-leaf');
+                } else {
+                    // Por defecto, abrimos solo el primer nivel (Raíz)
+                    if (codigo === data.nodoRaiz) details.open = true;
+                }
+
+                // Crear cabecera <summary>
+                const summary = document.createElement('summary');
+                
+                // Formatear precio
+                const precioFormateado = new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(concepto.precio);
+
+                summary.innerHTML = `
+                    <span class="item-icon"></span>
+                    <span class="item-code">${concepto.codigo}</span>
+                    <span class="item-desc" title="${concepto.resumen}">${concepto.resumen}</span>
+                    <span class="item-unit">${concepto.unidad || ''}</span>
+                    <span class="item-price">${precioFormateado}</span>
+                `;
+                details.appendChild(summary);
+
+                // Recursividad: Crear hijos
+                if (!esHoja) {
+                    // Prevenir que un click en un padre vacío haga cosas raras
+                    const childrenContainer = document.createElement('div');
+                    hijos.forEach(hijoCodigo => {
+                        const nodoHijo = crearNodo(hijoCodigo);
+                        if (nodoHijo) childrenContainer.appendChild(nodoHijo);
+                    });
+                    details.appendChild(childrenContainer);
+                } else {
+                    // Si es hoja, deshabilitar el click para que no intente expandirse
+                    summary.style.pointerEvents = 'none';
+                }
+
+                return details;
+            }
+
+            if (data.nodoRaiz) {
+                const domArbol = crearNodo(data.nodoRaiz);
+                treeRoot.appendChild(domArbol);
+            } else {
+                treeRoot.innerHTML = '<p style="color:red;">Error: No se pudo determinar la raíz del presupuesto. El archivo podría estar corrupto.</p>';
+            }
+        }
+    </script>
+</body>
+</html>
