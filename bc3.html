@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Visor y Gestor BC3 - Base Corregida</title>
+    <title>Visor y Gestor BC3 - Completo</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         details > summary { list-style: none; cursor: pointer; }
@@ -155,7 +155,7 @@
                 if (record.startsWith('~C|')) {
                     const cols = record.split('|');
                     if (cols.length < 2) continue;
-                    const codigo = cols[1].trim(); // Trim añadido para evitar fallos de espacios
+                    const codigo = cols[1].trim(); 
                     dbBC3.conceptos[codigo] = {
                         codigo: codigo,
                         unidad: cols[2] ? cols[2].trim() : 'ud',
@@ -178,7 +178,7 @@
                 else if (record.startsWith('~D|')) {
                     const cols = record.split('|');
                     if (cols.length < 2) continue;
-                    const padre = cols[1].trim(); // Trim añadido
+                    const padre = cols[1].trim();
                     
                     if (!dbBC3.descomposiciones[padre]) {
                         dbBC3.descomposiciones[padre] = [];
@@ -189,7 +189,7 @@
                         if (!comp || comp === '\\') continue;
                         
                         const partes = comp.split('\\');
-                        const hijo = partes[0].trim(); // Trim añadido
+                        const hijo = partes[0].trim();
                         const cantidad = partes.length > 1 && partes[1] !== '' ? parseNum(partes[1]) : 1;
                         
                         if (hijo) {
@@ -204,29 +204,59 @@
                 if (dbBC3.conceptos[padre]) dbBC3.conceptos[padre].esCapitulo = true;
             }
 
-            // Detección de Raíz robustecida
+            // *** EL GRAN CAMBIO: DETECCIÓN INTELIGENTE DE MÚLTIPLES RAÍCES ***
             let posiblesRaices = [];
             for (let c in dbBC3.descomposiciones) {
                 if (!codigosHijos.has(c)) posiblesRaices.push(c);
             }
             
-            if (posiblesRaices.length > 0) {
+            if (posiblesRaices.length === 1) {
+                // Caso ideal: Hay una única raíz maestra (Proyecto)
                 dbBC3.raiz = posiblesRaices[0];
+            } else if (posiblesRaices.length > 1) {
+                // Caso de tu archivo: Múltiples capítulos sueltos sin padre
+                const virtualRoot = "RAIZ_VIRTUAL_APP";
+                dbBC3.raiz = virtualRoot;
+                dbBC3.conceptos[virtualRoot] = {
+                    codigo: "PRESUPUESTO",
+                    unidad: '',
+                    resumen: 'PROYECTO GENERAL (Agrupador Automático)',
+                    precio: 0,
+                    esCapitulo: true,
+                    textoLargo: 'El archivo .bc3 exportó múltiples capítulos sin un proyecto padre. Esta raíz ha sido creada automáticamente para agruparlos.'
+                };
+                // Enganchamos todas las ramas huérfanas a esta nueva raíz
+                dbBC3.descomposiciones[virtualRoot] = posiblesRaices.map(r => ({ codigo: r, rendimiento: 1 }));
+                
             } else {
-                // Fallback de seguridad si hay bucles
-                const keys = Object.keys(dbBC3.descomposiciones);
-                if (keys.length > 0) dbBC3.raiz = keys[0];
+                // Caso extremo: No hay jerarquía (archivo plano) o hay un bucle circular infinito
+                const todos = Object.keys(dbBC3.conceptos);
+                if (todos.length > 0 && Object.keys(dbBC3.descomposiciones).length === 0) {
+                    const virtualRoot = "RAIZ_PLANA_APP";
+                    dbBC3.raiz = virtualRoot;
+                    dbBC3.conceptos[virtualRoot] = {
+                        codigo: "LISTADO",
+                        unidad: '',
+                        resumen: 'LISTADO DE CONCEPTOS',
+                        precio: 0,
+                        esCapitulo: true,
+                        textoLargo: 'Archivo sin estructura jerárquica detectada.'
+                    };
+                    dbBC3.descomposiciones[virtualRoot] = todos.map(c => ({ codigo: c, rendimiento: 1 }));
+                } else if (Object.keys(dbBC3.descomposiciones).length > 0) {
+                    dbBC3.raiz = Object.keys(dbBC3.descomposiciones)[0];
+                }
             }
 
-            // CREACIÓN DE RAÍZ VIRTUAL: Si la raíz existe en ~D pero el programa no la exportó en ~C
+            // Fallback para crear la raíz en conceptos si el programa origen olvidó declararla en ~C
             if (dbBC3.raiz && !dbBC3.conceptos[dbBC3.raiz]) {
                 dbBC3.conceptos[dbBC3.raiz] = {
                     codigo: dbBC3.raiz,
                     unidad: '',
-                    resumen: 'PROYECTO (Raíz Principal)',
+                    resumen: 'PROYECTO RAÍZ',
                     precio: 0,
                     esCapitulo: true,
-                    textoLargo: 'Nodo raíz generado automáticamente por el visor.'
+                    textoLargo: 'Nodo raíz generado automáticamente.'
                 };
             }
         }
@@ -248,7 +278,6 @@
             const concepto = dbBC3.conceptos[codigoNodo];
             const descomp = dbBC3.descomposiciones[codigoNodo];
             
-            // Si el hijo no está en el bloque ~C (referencia fantasma), lo saltamos
             if (!concepto) return document.createTextNode(''); 
 
             if (descomp && descomp.length > 0) {
@@ -260,7 +289,7 @@
                 
                 summary.innerHTML = `
                     <svg class="w-4 h-4 text-slate-400 group-open:rotate-90 transition-transform flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-                    <span class="font-bold text-slate-800 text-sm w-16 shrink-0">${concepto.codigo}</span>
+                    <span class="font-bold text-slate-800 text-sm w-16 shrink-0">${concepto.codigo === "PRESUPUESTO" ? "PROY" : concepto.codigo}</span>
                     <span class="text-sm text-gray-700 truncate" title="${concepto.resumen}">${concepto.resumen}</span>
                 `;
                 
@@ -301,7 +330,7 @@
             const c = dbBC3.conceptos[codigo];
             if(!c) return;
 
-            document.getElementById('detail-code').innerText = c.codigo;
+            document.getElementById('detail-code').innerText = c.codigo === "PRESUPUESTO" ? "Proyecto" : c.codigo;
             document.getElementById('detail-resumen').innerText = c.resumen;
             
             const desc = c.textoLargo || "";
@@ -311,7 +340,7 @@
             document.getElementById('detail-unit').innerText = `Unidad: ${c.unidad}`;
 
             let esProyectoRaiz = dbBC3.raiz === codigo;
-            let tipoLabel = esProyectoRaiz ? "Proyecto" : (c.esCapitulo ? "Capítulo / Subcapítulo" : "Partida / Concepto");
+            let tipoLabel = esProyectoRaiz ? "Proyecto Global" : (c.esCapitulo ? "Capítulo / Subcapítulo" : "Partida / Concepto");
             document.getElementById('detail-type').innerText = tipoLabel;
             document.getElementById('detail-type').className = c.esCapitulo 
                 ? "bg-slate-700 text-white text-xs font-bold px-2.5 py-1 rounded" 
