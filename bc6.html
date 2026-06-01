@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visor de Presupuestos BC3</title>
+    <style>
+        :root {
+            --primary: #2c3e50;
+            --border: #bdc3c7;
+            --bg-light: #f8f9fa;
+            --hover: #e9ecef;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+            background-color: #fff;
+            color: #333;
+        }
+        /* Header / Toolbar */
+        #toolbar {
+            position: absolute;
+            top: 0;
+            width: 100%;
+            height: 50px;
+            background-color: var(--primary);
+            color: white;
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            box-sizing: border-box;
+            z-index: 10;
+        }
+        #toolbar input[type="file"] {
+            margin-left: 20px;
+            color: white;
+        }
+        /* Layout */
+        #container {
+            display: flex;
+            width: 100%;
+            margin-top: 50px;
+            height: calc(100vh - 50px);
+        }
+        /* Panel Izquierdo (Árbol) */
+        #sidebar {
+            width: 35%;
+            min-width: 250px;
+            border-right: 1px solid var(--border);
+            background-color: var(--bg-light);
+            overflow-y: auto;
+            padding: 15px;
+            box-sizing: border-box;
+        }
+        /* Panel Derecho (Detalles) */
+        #main-panel {
+            flex: 1;
+            padding: 25px;
+            overflow-y: auto;
+            box-sizing: border-box;
+        }
+        /* Estilos del Árbol */
+        ul {
+            list-style-type: none;
+            padding-left: 20px;
+            margin: 5px 0;
+        }
+        #tree-root { padding-left: 0; }
+        
+        .tree-node {
+            margin: 4px 0;
+            white-space: nowrap;
+        }
+        .node-content {
+            cursor: pointer;
+            padding: 4px 6px;
+            border-radius: 4px;
+            display: inline-block;
+            font-size: 14px;
+        }
+        .node-content:hover { background-color: var(--hover); }
+        .node-content.selected {
+            background-color: #3498db;
+            color: white;
+        }
+        .caret {
+            cursor: pointer;
+            user-select: none;
+            display: inline-block;
+            width: 16px;
+            text-align: center;
+            color: #7f8c8d;
+            font-size: 12px;
+        }
+        .caret::before { content: "\25B6"; } /* Flecha derecha */
+        .caret-down::before { content: "\25BC"; } /* Flecha abajo */
+        
+        .nested { display: none; }
+        .active { display: block; }
+
+        /* Estilos de Detalles */
+        .detail-group { margin-bottom: 20px; }
+        .detail-group label {
+            display: block;
+            font-size: 12px;
+            color: #7f8c8d;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+        .detail-value {
+            font-size: 16px;
+            padding: 8px;
+            background-color: var(--bg-light);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        th, td {
+            border: 1px solid var(--border);
+            padding: 8px;
+            text-align: left;
+            font-size: 14px;
+        }
+        th { background-color: var(--hover); }
+    </style>
+</head>
+<body>
+
+    <div id="toolbar">
+        <strong>Visor BC3</strong>
+        <input type="file" id="fileInput" accept=".bc3">
+    </div>
+
+    <div id="container">
+        <div id="sidebar">
+            <ul id="tree-root">
+                <li style="color: #7f8c8d; font-size: 14px;">Carga un archivo .bc3 para visualizar el presupuesto.</li>
+            </ul>
+        </div>
+        <div id="main-panel">
+            <h2 style="margin-top: 0; color: var(--primary);">Detalles de la Partida</h2>
+            <div id="details-container" style="display: none;">
+                <div class="detail-group">
+                    <label>Código</label>
+                    <div class="detail-value" id="det-code"></div>
+                </div>
+                <div class="detail-group">
+                    <label>Resumen</label>
+                    <div class="detail-value" id="det-summary"></div>
+                </div>
+                <div style="display: flex; gap: 20px;">
+                    <div class="detail-group" style="flex: 1;">
+                        <label>Unidad</label>
+                        <div class="detail-value" id="det-unit"></div>
+                    </div>
+                    <div class="detail-group" style="flex: 1;">
+                        <label>Precio</label>
+                        <div class="detail-value" id="det-price"></div>
+                    </div>
+                </div>
+                <div class="detail-group">
+                    <label>Descripción Larga</label>
+                    <div class="detail-value" id="det-desc" style="white-space: pre-wrap; min-height: 80px;"></div>
+                </div>
+                
+                <div class="detail-group" id="descomposicion-group">
+                    <label>Descomposición (Medición / Rendimiento)</label>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Código</th>
+                                <th>Resumen</th>
+                                <th>Ud.</th>
+                                <th>Cantidad/Factor</th>
+                                <th>Precio</th>
+                                <th>Importe</th>
+                            </tr>
+                        </thead>
+                        <tbody id="det-table-body">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let db = { concepts: {}, root: null };
+
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            // Los archivos BC3 suelen estar en codificación windows-1252 (ANSI) para los acentos en español
+            reader.readAsText(file, 'windows-1252');
+            reader.onload = function(e) {
+                const content = e.target.result;
+                parseBC3(content);
+                renderTree();
+            };
+        });
+
+        function parseBC3(content) {
+            db.concepts = {};
+            db.root = null;
+            const decompositions = [];
+            
+            // Separar por líneas y procesar los registros principales (~C, ~D, ~T)
+            const lines = content.split(/\r?\n/);
+            
+            lines.forEach(line => {
+                if (!line.startsWith('~')) return;
+                
+                const parts = line.split('|');
+                const type = parts[0];
+
+                if (type === '~C') {
+                    // ~C | Código | Unidad | Resumen | Precio | Fecha | Tipo ...
+                    const code = parts[1];
+                    if (!db.root) db.root = code; // Asumimos que el primer concepto es el raíz (Proyecto)
+                    
+                    db.concepts[code] = {
+                        code: code,
+                        unit: parts[2] || '',
+                        summary: parts[3] || '',
+                        price: parseFloat((parts[4] || '0').replace(',', '.')) || 0,
+                        children: [],
+                        description: ''
+                    };
+                } 
+                else if (type === '~D') {
+                    // ~D | Padre | Hijo1\Factor1\Hijo2\Factor2\...
+                    const parent = parts[1];
+                    const childrenData = parts[2] ? parts[2].split('\\') : [];
+                    
+                    for (let i = 0; i < childrenData.length - 1; i += 2) {
+                        const childCode = childrenData[i];
+                        const factor = parseFloat((childrenData[i+1] || '1').replace(',', '.')) || 0;
+                        if (childCode) {
+                            decompositions.push({ parent, child: childCode, factor });
+                        }
+                    }
+                }
+                else if (type === '~T') {
+                    // ~T | Código | Texto largo...
+                    const code = parts[1];
+                    let text = parts[2] || '';
+                    if (db.concepts[code]) {
+                        // Limpiar caracteres extraños del texto si los hay
+                        db.concepts[code].description = text.replace(/\\n/g, '\n');
+                    }
+                }
+            });
+
+            // Ensamblar el árbol
+            decompositions.forEach(dec => {
+                if (db.concepts[dec.parent] && db.concepts[dec.child]) {
+                    db.concepts[dec.parent].children.push({
+                        concept: db.concepts[dec.child],
+                        factor: dec.factor
+                    });
+                }
+            });
+        }
+
+        function renderTree() {
+            const treeRoot = document.getElementById('tree-root');
+            treeRoot.innerHTML = '';
+            
+            if (!db.root || !db.concepts[db.root]) {
+                treeRoot.innerHTML = '<li>Error al leer el archivo. Formato no reconocido.</li>';
+                return;
+            }
+
+            const rootEl = createTreeNode(db.concepts[db.root], true);
+            treeRoot.appendChild(rootEl);
+            
+            // Seleccionar y expandir la raíz por defecto
+            rootEl.querySelector('.caret').click();
+            rootEl.querySelector('.node-content').click();
+        }
+
+        function createTreeNode(concept, isRoot = false) {
+            const li = document.createElement('li');
+            li.className = 'tree-node';
+
+            const hasChildren = concept.children.length > 0;
+            
+            // Icono de despliegue
+            const caret = document.createElement('span');
+            caret.className = hasChildren ? 'caret' : 'caret'; 
+            if(!hasChildren) caret.style.visibility = 'hidden';
+
+            // Contenido del nodo (Texto)
+            const content = document.createElement('div');
+            content.className = 'node-content';
+            content.textContent = `${concept.code} - ${concept.summary}`;
+            
+            li.appendChild(caret);
+            li.appendChild(content);
+
+            // Sub-árbol
+            if (hasChildren) {
+                const ul = document.createElement('ul');
+                ul.className = 'nested';
+                concept.children.forEach(child => {
+                    ul.appendChild(createTreeNode(child.concept));
+                });
+                li.appendChild(ul);
+
+                // Evento para expandir/contraer
+                caret.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    this.classList.toggle('caret-down');
+                    ul.classList.toggle('active');
+                });
+            }
+
+            // Evento para seleccionar y mostrar detalles
+            content.addEventListener('click', function(e) {
+                e.stopPropagation();
+                // Limpiar selección previa
+                document.querySelectorAll('.node-content').forEach(el => el.classList.remove('selected'));
+                this.classList.add('selected');
+                showDetails(concept);
+            });
+
+            return li;
+        }
+
+        function showDetails(concept) {
+            document.getElementById('details-container').style.display = 'block';
+            
+            document.getElementById('det-code').textContent = concept.code;
+            document.getElementById('det-summary').textContent = concept.summary;
+            document.getElementById('det-unit').textContent = concept.unit;
+            
+            // Formatear precio
+            const formatter = new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' });
+            document.getElementById('det-price').textContent = formatter.format(concept.price);
+            
+            document.getElementById('det-desc').textContent = concept.description || 'Sin descripción detallada.';
+
+            // Mostrar tabla de descomposición si tiene hijos
+            const tbody = document.getElementById('det-table-body');
+            tbody.innerHTML = '';
+            
+            if (concept.children.length > 0) {
+                document.getElementById('descomposicion-group').style.display = 'block';
+                concept.children.forEach(child => {
+                    const tr = document.createElement('tr');
+                    const c = child.concept;
+                    const importe = child.factor * c.price;
+                    
+                    tr.innerHTML = `
+                        <td>${c.code}</td>
+                        <td>${c.summary}</td>
+                        <td>${c.unit}</td>
+                        <td>${child.factor.toLocaleString('es-ES', {minimumFractionDigits: 2, maximumFractionDigits: 3})}</td>
+                        <td>${formatter.format(c.price)}</td>
+                        <td><strong>${formatter.format(importe)}</strong></td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } else {
+                document.getElementById('descomposicion-group').style.display = 'none';
+            }
+        }
+    </script>
+</body>
+</html>
