@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visor y Gestor BC3 - Base</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Estilos para el árbol desplegable */
+        details > summary { list-style: none; cursor: pointer; }
+        details > summary::-webkit-details-marker { display: none; }
+        .tree-line { border-left: 2px solid #e5e7eb; margin-left: 12px; padding-left: 12px; }
+        .drag-over { background-color: #eff6ff !important; border-color: #3b82f6 !important; }
+    </style>
+</head>
+<body class="bg-gray-100 h-screen flex flex-col font-sans overflow-hidden">
+
+    <header class="bg-slate-800 text-white p-4 flex justify-between items-center shadow-md z-10">
+        <div class="flex items-center gap-3">
+            <svg class="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+            <h1 class="text-xl font-bold tracking-wide">Gestor BC3 Base</h1>
+        </div>
+        <div class="space-x-2">
+            <button id="btn-export-csv" class="bg-slate-600 hover:bg-slate-500 px-4 py-2 rounded text-sm transition hidden">Exportar a CSV</button>
+        </div>
+    </header>
+
+    <main class="flex-1 flex overflow-hidden">
+        
+        <aside class="w-1/3 bg-white border-r border-gray-200 flex flex-col shadow-sm z-0">
+            
+            <div id="drop-zone" class="p-4 border-b border-gray-200 bg-gray-50 transition-colors">
+                <input type="file" id="file-input" accept=".bc3" class="hidden">
+                <div id="drop-box" class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer hover:bg-gray-100 transition">
+                    <svg class="mx-auto h-8 w-8 text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                    <p class="text-sm text-gray-600 font-medium">Haz clic para abrir .BC3</p>
+                    <p class="text-xs text-gray-400 mt-1">o arrastra el archivo aquí</p>
+                </div>
+            </div>
+
+            <div class="flex-1 overflow-y-auto p-4" id="tree-container">
+                <div class="text-center text-gray-400 mt-10 text-sm">
+                    El presupuesto aparecerá aquí una vez cargues el archivo.
+                </div>
+            </div>
+        </aside>
+
+        <section class="flex-1 bg-slate-50 p-6 overflow-y-auto">
+            <div id="details-panel" class="hidden">
+                
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+                    <div class="flex items-start justify-between mb-4">
+                        <div>
+                            <span class="bg-blue-100 text-blue-800 text-xs font-bold px-2.5 py-1 rounded" id="detail-type">Partida</span>
+                            <h2 class="text-2xl font-bold text-gray-800 mt-2" id="detail-code">CÓDIGO</h2>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-sm text-gray-500">Precio Unitario</p>
+                            <p class="text-3xl font-bold text-blue-600" id="detail-price">0.00 €</p>
+                            <p class="text-sm font-medium text-gray-500 mt-1" id="detail-unit">Unidad: m2</p>
+                        </div>
+                    </div>
+                    <p class="text-gray-700 leading-relaxed" id="detail-desc">Descripción de la partida o capítulo seleccionado...</p>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-0 overflow-hidden">
+                    <div class="bg-gray-50 px-6 py-3 border-b border-gray-200">
+                        <h3 class="font-semibold text-gray-800">Descomposición (Componentes)</h3>
+                    </div>
+                    <table class="w-full text-sm text-left text-gray-600">
+                        <thead class="text-xs text-gray-500 uppercase bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3">Código</th>
+                                <th class="px-6 py-3">Descripción</th>
+                                <th class="px-6 py-3 text-right">Rendimiento</th>
+                                <th class="px-6 py-3 text-right">Precio</th>
+                                <th class="px-6 py-3 text-right">Subtotal</th>
+                            </tr>
+                        </thead>
+                        <tbody id="breakdown-table">
+                            </tbody>
+                    </table>
+                    <div id="no-breakdown" class="p-6 text-center text-gray-500 hidden">
+                        Este elemento no tiene descomposición (Es un concepto básico o material).
+                    </div>
+                </div>
+
+            </div>
+            
+            <div id="empty-state" class="h-full flex flex-col items-center justify-center text-gray-400">
+                <svg class="w-16 h-16 mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                <p>Selecciona un capítulo o partida en el panel izquierdo para ver sus detalles.</p>
+            </div>
+        </section>
+
+    </main>
+
+    <script>
+        /**
+         * Lógica Central del Visor Local FIEBDC-3 (.BC3)
+         * No requiere backend. Todo se procesa en el navegador.
+         */
+
+        // Base de Datos en Memoria Local
+        let dbBC3 = {
+            conceptos: {},       // Guarda los ~C (Código, texto, precio, unidad)
+            descomposiciones: {},// Guarda los ~D (Padre -> Array de Hijos con cantidad)
+            raiz: null           // El código del proyecto general (El nodo más alto)
+        };
+
+        // --- 1. MANEJO DE ARCHIVOS (Drag & Drop y Clic) ---
+        const dropBox = document.getElementById('drop-box');
+        const fileInput = document.getElementById('file-input');
+
+        // Evento: Clic para abrir el selector de archivos
+        dropBox.addEventListener('click', () => fileInput.click());
+
+        // Eventos: Drag and Drop
+        dropBox.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropBox.classList.add('drag-over');
+        });
+        dropBox.addEventListener('dragleave', () => dropBox.classList.remove('drag-over'));
+        dropBox.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropBox.classList.remove('drag-over');
+            if (e.dataTransfer.files.length) procesarArchivoBase(e.dataTransfer.files[0]);
+        });
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length) procesarArchivoBase(e.target.files[0]);
+        });
+
+        // --- 2. LECTOR Y PARSER DEL ARCHIVO .BC3 ---
+        function procesarArchivoBase(file) {
+            if (!file.name.toLowerCase().endsWith('.bc3')) {
+                alert("Por favor, selecciona un archivo válido con extensión .bc3");
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    analizarTextoBC3(e.target.result);
+                    construirArbolUI();
+                    document.getElementById('btn-export-csv').classList.remove('hidden');
+                } catch (error) {
+                    console.error(error);
+                    alert("Error leyendo el archivo. Asegúrate de que el formato FIEBDC-3 esté correcto.");
+                }
+            };
+            // Codificación FIEBDC-3 tradicional española
+            reader.readAsText(file, 'windows-1252'); 
+        }
+
+        function analizarTextoBC3(texto) {
+            // Reiniciar BD
+            dbBC3 = { conceptos: {}, descomposiciones: {}, raiz: null };
+            const codigosHijos = new Set();
+            
+            const lineas = texto.split(/\r?\n/);
+
+            for (let linea of lineas) {
+                if (linea.startsWith('~C|')) {
+                    // ~C|Código|Unidad|Resumen|Precio|Fecha|Tipo|...
+                    const cols = linea.split('|');
+                    dbBC3.conceptos[cols[1]] = {
+                        codigo: cols[1],
+                        unidad: cols[2] || 'ud',
+                        resumen: cols[3] || 'Sin descripción',
+                        precio: parseFloat(cols[4].replace(',', '.')) || 0,
+                        esCapitulo: false // Se confirmará si aparece en un ~D
+                    };
+                } else if (linea.startsWith('~D|')) {
+                    // ~D|Padre|Hijo1\Cant1|Hijo2\Cant2|...
+                    const cols = linea.split('|');
+                    const padre = cols[1];
+                    dbBC3.descomposiciones[padre] = [];
+                    
+                    for (let i = 2; i < cols.length; i++) {
+                        if (!cols[i] || cols[i] === '\\') continue;
+                        const partes = cols[i].split('\\');
+                        const hijo = partes[0];
+                        const cantidad = parseFloat(partes[1].replace(',', '.')) || 1;
+                        
+                        if (hijo) {
+                            dbBC3.descomposiciones[padre].push({ codigo: hijo, rendimiento: cantidad });
+                            codigosHijos.add(hijo);
+                        }
+                    }
+                    if (dbBC3.conceptos[padre]) dbBC3.conceptos[padre].esCapitulo = true;
+                }
+            }
+
+            // Encontrar la raíz principal (El proyecto)
+            for (let c in dbBC3.conceptos) {
+                if (!codigosHijos.has(c) && dbBC3.descomposiciones[c]) {
+                    dbBC3.raiz = c;
+                    break;
+                }
+            }
+        }
+
+        // --- 3. CONSTRUCCIÓN DE LA INTERFAZ VISUAL ---
+        function construirArbolUI() {
+            const container = document.getElementById('tree-container');
+            container.innerHTML = ''; // Limpiar panel izquierdo
+
+            if (!dbBC3.raiz) {
+                container.innerHTML = '<p class="text-red-500">No se encontró la estructura raíz del presupuesto.</p>';
+                return;
+            }
+
+            // Crear el nodo raíz interactivo
+            const nodoHTML = crearNodoArbol(dbBC3.raiz, true);
+            container.appendChild(nodoHTML);
+        }
+
+        function crearNodoArbol(codigoNodo, isOpen = false) {
+            const concepto = dbBC3.conceptos[codigoNodo];
+            const descomp = dbBC3.descomposiciones[codigoNodo];
+            
+            if (!concepto) return document.createTextNode('');
+
+            // Si tiene hijos, es un grupo (Capítulo/Proyecto), usamos <details>
+            if (descomp && descomp.length > 0) {
+                const details = document.createElement('details');
+                if (isOpen) details.open = true;
+                
+                const summary = document.createElement('summary');
+                summary.className = "flex items-center gap-2 py-1.5 hover:bg-blue-50 rounded select-none group";
+                summary.innerHTML = `
+                    <svg class="w-4 h-4 text-gray-400 group-open:rotate-90 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                    <span class="font-bold text-slate-700 text-sm w-16 shrink-0">${concepto.codigo}</span>
+                    <span class="text-sm text-gray-600 truncate" title="${concepto.resumen}">${concepto.resumen}</span>
+                `;
+                
+                // Evento para ver detalles al hacer clic en el texto
+                summary.querySelector('span:nth-child(3)').addEventListener('click', (e) => {
+                    e.preventDefault(); // Evitar que colapse el árbol al seleccionar
+                    mostrarDetalles(codigoNodo);
+                });
+
+                details.appendChild(summary);
+
+                const divHijos = document.createElement('div');
+                divHijos.className = "tree-line";
+                
+                // Recorrer de forma recursiva (Jerarquía)
+                descomp.forEach(hijo => {
+                    divHijos.appendChild(crearNodoArbol(hijo.codigo, false));
+                });
+                
+                details.appendChild(divHijos);
+                return details;
+            } else {
+                // Es una partida o material (hoja final), usamos un div simple
+                const div = document.createElement('div');
+                div.className = "flex items-center gap-2 py-1.5 hover:bg-blue-50 rounded cursor-pointer pl-6";
+                div.innerHTML = `
+                    <svg class="w-3 h-3 text-blue-400 shrink-0" fill="currentColor" viewBox="0 0 20 20"><circle cx="10" cy="10" r="10"/></svg>
+                    <span class="font-semibold text-blue-800 text-sm w-16 shrink-0">${concepto.codigo}</span>
+                    <span class="text-sm text-gray-600 truncate" title="${concepto.resumen}">${concepto.resumen}</span>
+                `;
+                div.addEventListener('click', () => mostrarDetalles(codigoNodo));
+                return div;
+            }
+        }
+
+        function mostrarDetalles(codigo) {
+            document.getElementById('empty-state').classList.add('hidden');
+            const panel = document.getElementById('details-panel');
+            panel.classList.remove('hidden');
+
+            const c = dbBC3.conceptos[codigo];
+            if(!c) return;
+
+            document.getElementById('detail-code').innerText = c.codigo;
+            document.getElementById('detail-desc').innerText = c.resumen;
+            document.getElementById('detail-price').innerText = c.precio.toLocaleString('es-ES', {minimumFractionDigits: 2}) + ' €';
+            document.getElementById('detail-unit').innerText = `Unidad: ${c.unidad}`;
+            document.getElementById('detail-type').innerText = c.esCapitulo ? (dbBC3.raiz === codigo ? "Proyecto Raíz" : "Capítulo") : "Partida / Concepto";
+
+            // Mostrar Descomposición en la tabla inferior
+            const tb = document.getElementById('breakdown-table');
+            const msgVacio = document.getElementById('no-breakdown');
+            tb.innerHTML = '';
+            
+            const descomp = dbBC3.descomposiciones[codigo];
+            if (descomp && descomp.length > 0) {
+                tb.parentElement.classList.remove('hidden');
+                msgVacio.classList.add('hidden');
+                
+                descomp.forEach(item => {
+                    const hijo = dbBC3.conceptos[item.codigo];
+                    if(!hijo) return;
+                    
+                    const subtotal = item.rendimiento * hijo.precio;
+                    const tr = document.createElement('tr');
+                    tr.className = "bg-white border-b hover:bg-gray-50 cursor-pointer";
+                    tr.innerHTML = `
+                        <td class="px-6 py-3 font-medium text-blue-600">${hijo.codigo}</td>
+                        <td class="px-6 py-3 truncate max-w-xs" title="${hijo.resumen}">${hijo.resumen}</td>
+                        <td class="px-6 py-3 text-right">${item.rendimiento.toLocaleString('es-ES', {maximumFractionDigits: 4})} ${hijo.unidad}</td>
+                        <td class="px-6 py-3 text-right">${hijo.precio.toLocaleString('es-ES', {minimumFractionDigits: 2})} €</td>
+                        <td class="px-6 py-3 text-right font-bold text-gray-700">${subtotal.toLocaleString('es-ES', {minimumFractionDigits: 2})} €</td>
+                    `;
+                    // Navegación dentro del propio panel derecho al hacer clic en un hijo
+                    tr.addEventListener('click', () => mostrarDetalles(hijo.codigo));
+                    tb.appendChild(tr);
+                });
+            } else {
+                tb.parentElement.classList.add('hidden');
+                msgVacio.classList.remove('hidden');
+            }
+        }
+
+        // --- 4. EXPORTACIÓN BÁSICA A CSV ---
+        document.getElementById('btn-export-csv').addEventListener('click', () => {
+            if(!dbBC3.raiz) return;
+            
+            let csvData = "Código,Unidad,Resumen,Precio\n";
+            for (let key in dbBC3.conceptos) {
+                const c = dbBC3.conceptos[key];
+                // Escapar comillas dobles en el resumen
+                const resumenEscapado = c.resumen.replace(/"/g, '""');
+                csvData += `"${c.codigo}","${c.unidad}","${resumenEscapado}",${c.precio}\n`;
+            }
+
+            const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csvData], { type: 'text/csv;charset=utf-8' }); // UTF-8 BOM para Excel
+            const enlace = document.createElement('a');
+            enlace.href = URL.createObjectURL(blob);
+            enlace.download = "Presupuesto_Exportado.csv";
+            enlace.click();
+        });
+    </script>
+</body>
+</html>
