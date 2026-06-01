@@ -3,159 +3,233 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Visor BC3 - Primera Versión</title>
+    <title>Visor FIEBDC-3 (BC3) - Versión Completa Funcional</title>
     <style>
         :root {
-            --primary: #2563eb;
-            --bg-body: #f3f4f6;
+            --primary: #0056b3;
+            --bg-body: #f4f7f6;
             --bg-card: #ffffff;
-            --border: #e5e7eb;
-            --text-main: #1f2937;
-            --text-muted: #6b7280;
+            --border: #d1d5db;
+            --text-main: #333333;
+            --text-muted: #666666;
+            --chapter-bg: #e2e8f0;
+            --item-bg: #ffffff;
+            --hover-bg: #f0f9ff;
+            
+            /* Anchos de columna fijos */
+            --col-icon: 24px;
+            --col-code: 120px;
+            --col-desc: auto;
+            --col-unit: 60px;
+            --col-qty: 90px;
+            --col-price: 100px;
+            --col-amount: 110px;
         }
 
         body {
-            font-family: system-ui, -apple-system, sans-serif;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background-color: var(--bg-body);
             color: var(--text-main);
             margin: 0;
-            padding: 2rem;
+            padding: 1rem;
         }
 
-        .container {
-            max-width: 1200px;
+        .main-container {
+            max-width: 1400px;
             margin: 0 auto;
-            background: var(--bg-card);
-            padding: 2rem;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
         }
 
         header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            border-bottom: 2px solid var(--border);
-            padding-bottom: 1.5rem;
-            margin-bottom: 1.5rem;
+            padding: 1rem;
+            background: var(--bg-card);
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            margin-bottom: 1rem;
         }
 
-        .upload-area {
-            border: 2px dashed var(--border);
-            padding: 2rem;
+        /* Zona de Carga */
+        .upload-zone {
+            border: 3px dashed var(--border);
+            padding: 3rem;
             text-align: center;
             border-radius: 8px;
-            background: #f9fafb;
+            background: var(--bg-card);
             cursor: pointer;
-            transition: border-color 0.3s;
+            transition: all 0.3s;
         }
 
-        .upload-area:hover {
+        .upload-zone:hover {
             border-color: var(--primary);
+            background: #fdfdfd;
         }
 
-        /* Estilos del Árbol */
-        .tree-container {
-            margin-top: 1rem;
-        }
-
-        details {
-            margin-left: 1.5rem;
-        }
-
-        /* Ocultar el marcador nativo del details y crear un diseño flex */
-        summary {
-            display: flex;
-            align-items: center;
-            padding: 0.5rem;
-            cursor: pointer;
-            border-bottom: 1px solid var(--border);
-            list-style: none;
-            gap: 1rem;
-        }
-
-        summary::-webkit-details-marker {
+        #viewer-container {
             display: none;
         }
 
-        summary:hover {
+        /* Estructura de Tabla de Árbol */
+        .bc3-tree {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+
+        /* Cabecera de la tabla imitando el ejemplo */
+        .tree-header {
+            display: grid;
+            grid-template-columns: var(--col-icon) var(--col-code) var(--col-desc) var(--col-unit) var(--col-qty) var(--col-price) var(--col-amount);
+            font-weight: bold;
             background-color: #f8fafc;
+            border: 1px solid var(--border);
+            padding: 0.75rem 0.5rem;
+            border-radius: 4px;
+            margin-bottom: 0.5rem;
+            gap: 5px;
         }
 
-        .item-icon {
+        .tree-header span { text-align: center; }
+        .tree-header .col-desc { text-align: left; }
+        .tree-header .col-price, .tree-header .col-amount { text-align: right; }
+
+        /* Estilos de nodo genéricos */
+        details {
+            border: 1px solid transparent;
+        }
+
+        summary {
+            display: grid;
+            grid-template-columns: var(--col-icon) var(--col-code) var(--col-desc) var(--col-unit) var(--col-qty) var(--col-price) var(--col-amount);
+            align-items: center;
+            padding: 0.5rem;
+            cursor: pointer;
+            list-style: none;
+            gap: 5px;
+            border-bottom: 1px solid #edf2f7;
+        }
+
+        summary:hover { background-color: var(--hover-bg); }
+        summary::-webkit-details-marker { display: none; }
+
+        .col { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 4px; }
+        .col-code { font-family: monospace; color: var(--primary); }
+        .col-qty, .col-price, .col-amount { text-align: right; font-weight: 600; }
+        .col-unit { text-align: center; color: var(--text-muted); }
+
+        /* Iconos de Capítulo vs Partida */
+        .node-icon { text-align: center; width: var(--col-icon); }
+        details > summary .node-icon::before { content: "▸"; color: var(--text-muted); }
+        details[open] > summary .node-icon::before { content: "▾"; }
+
+        /* Capítulos */
+        .node-chapter > summary {
+            background-color: var(--chapter-bg);
+            font-weight: bold;
+            border-bottom: 1px solid var(--border);
+        }
+        .node-chapter > details { margin-left: 1.2rem; border-left: 1px solid var(--border); }
+
+        /* Partidas (Hojas) */
+        .node-item > summary {
+            background-color: var(--item-bg);
+        }
+        .node-item > summary .node-icon::before { content: "•"; color: var(--primary); }
+
+        /* Panel de Detalle Interno de la Partida */
+        .item-details-panel {
+            background-color: #f9fafb;
+            padding: 1rem;
+            margin-left: 2rem;
+            border: 1px solid #e5e7eb;
+            border-radius: 4px;
+            margin-bottom: 0.5rem;
+        }
+
+        .detail-section { margin-bottom: 1rem; }
+        .detail-header {
+            font-weight: bold;
+            color: var(--primary);
+            border-bottom: 2px solid #e2e8f0;
+            padding-bottom: 0.25rem;
+            margin-bottom: 0.5rem;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+        }
+
+        /* Estilo para Texto Largo (~T) */
+        .long-description {
+            font-size: 0.85rem;
+            line-height: 1.5;
+            color: #4a5568;
+            white-space: pre-wrap; /* Respeta saltos de línea */
+        }
+
+        /* Estilo para Mediciones (~M) */
+        .measurements-table {
+            width: 100%;
+            border-collapse: collapse;
             font-size: 0.8rem;
-            width: 15px;
-            color: var(--text-muted);
         }
+        .measurements-table th { background: #edf2f7; text-align: left; padding: 4px; border: 1px solid #dadada; }
+        .measurements-table td { padding: 4px; border: 1px solid #dadada; }
+        .measurements-table .num { text-align: right; width: 60px; }
+        .measurements-table .total { font-weight: bold; background: #fff; }
 
-        details[open] > summary .item-icon::before {
-            content: "▼";
-        }
-        
-        details:not([open]) > summary .item-icon::before {
-            content: "▶";
-        }
+        .item-leaf-marker summary { pointer-events: none; }
+        .item-leaf-marker summary .node-icon::before { content: " " !important;}
 
-        /* Hoja final (partida sin hijos) */
-        .is-leaf > summary .item-icon::before {
-            content: "•";
-            color: var(--primary);
-        }
-
-        .item-code {
-            font-weight: 600;
-            color: var(--primary);
-            min-width: 120px;
-        }
-
-        .item-desc {
-            flex-grow: 1;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .item-unit {
-            color: var(--text-muted);
-            min-width: 50px;
-            text-align: center;
-        }
-
-        .item-price {
-            font-weight: 600;
-            min-width: 100px;
-            text-align: right;
-        }
     </style>
 </head>
 <body>
 
-    <div class="container">
+    <div class="main-container">
         <header>
-            <h2>Visor FIEBDC-3 (.bc3)</h2>
+            <h2>Visualizador FIEBDC-3 (.bc3) Profesional</h2>
+            <button onclick="location.reload()" style="padding: 5px 10px;">Cargar otro</button>
         </header>
 
-        <div class="upload-area" id="drop-zone">
-            <p>Arrastra un archivo BC3 aquí o haz clic para seleccionar</p>
+        <div class="upload-zone" id="drop-zone">
+            <h3>Arrastra tu archivo .bc3 aquí</h3>
+            <p>o haz clic para buscar en tu ordenador</p>
             <input type="file" id="file-input" accept=".bc3" style="display: none;">
         </div>
 
-        <div class="tree-container" id="tree-root">
+        <div id="viewer-container">
+            <div class="tree-header">
+                <span class="col-icon"></span>
+                <span class="col-code">Código</span>
+                <span class="col-desc">Descripción</span>
+                <span class="col-unit">Ud</span>
+                <span class="col-qty">Cant.</span>
+                <span class="col-price">Precio (€)</span>
+                <span class="col-amount">Importe (€)</span>
             </div>
+            
+            <div id="tree-root">
+                </div>
+        </div>
     </div>
 
     <script>
+        // --- CONFIGURACIÓN ---
         const fileInput = document.getElementById('file-input');
         const dropZone = document.getElementById('drop-zone');
+        const viewerContainer = document.getElementById('viewer-container');
         const treeRoot = document.getElementById('tree-root');
 
-        // Eventos de carga de archivo
+        // Formateadores de moneda y número
+        const formatEuro = new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' });
+        const formatNumber = new Intl.NumberFormat('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 3 });
+
+        // --- EVENTOS DE CARGA ---
         dropZone.addEventListener('click', () => fileInput.click());
-        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.style.borderColor = '#2563eb'; });
-        dropZone.addEventListener('dragleave', () => dropZone.style.borderColor = '#e5e7eb');
+        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.style.borderColor = '#0056b3'; });
+        dropZone.addEventListener('dragleave', () => dropZone.style.borderColor = '#d1d5db');
         dropZone.addEventListener('drop', (e) => {
             e.preventDefault();
-            dropZone.style.borderColor = '#e5e7eb';
+            dropZone.style.borderColor = '#d1d5db';
             if (e.dataTransfer.files.length) procesarArchivo(e.dataTransfer.files[0]);
         });
         fileInput.addEventListener('change', (e) => {
@@ -164,126 +238,224 @@
 
         function procesarArchivo(file) {
             const reader = new FileReader();
-            // Los archivos BC3 en España suelen usar codificación ISO-8859-1 (ANSI)
-            reader.readAsText(file, 'ISO-8859-1');
+            // Muy importante: ISO-8859-1 para archivos BC3 estándar españoles
+            reader.readAsText(file, 'ISO-8859-1'); 
             reader.onload = (e) => {
-                const data = parsearBC3(e.target.result);
-                renderizarArbol(data);
-                dropZone.style.display = 'none'; // Ocultar zona de carga tras el éxito
+                try {
+                    const data = parsearBC3Completo(e.target.result);
+                    renderizarArbolProfesional(data);
+                    dropZone.style.display = 'none';
+                    viewerContainer.style.display = 'block';
+                } catch (err) {
+                    alert("Error parseando el archivo. Asegúrate de que es un formato BC3 válido.");
+                    console.error(err);
+                }
             };
         }
 
-        function parsearBC3(contenido) {
-            // Eliminar saltos de línea para evitar problemas con registros divididos
-            const textoLimpio = contenido.replace(/\r\n|\r|\n/g, '');
-            // Dividir por el carácter '~' para aislar cada registro
-            const registros = textoLimpio.split('~');
+        // --- MOTOR DE PARSING AVANZADO ---
+        function parsearBC3Completo(contenido) {
+            // Unir líneas si un registro está dividido
+            const textoLimpio = contenido.replace(/\r\n|\r|\n/g, '\n').replace(/\\\n/g, '');
+            const líneas = textoLimpio.split('\n');
 
-            const conceptos = {};
-            const jerarquia = {};
-            const hijosSet = new Set(); // Para saber qué nodos son hijos y encontrar la raíz absoluta
+            const conceptos = {}; // Diccionario principal de todos los C
+            const jerarquia = {}; // Relaciones de Capítulos (D)
+            const mediciones = {}; // Líneas de medición (M)
+            const textosLargos = {}; // Textos (T)
+            const hijosSet = new Set(); // Para encontrar raíces absolutas
 
-            registros.forEach(registro => {
-                if (!registro) return;
+            líneas.forEach(línea => {
+                if (!línea || línea.charAt(0) !== '~') return;
                 
-                const tipo = registro.charAt(0);
-                const campos = registro.substring(1).split('|');
+                const tipo = línea.charAt(1);
+                const campos = línea.substring(2).split('|');
 
-                // Registro ~C: Concepto (Capítulo, Partida o Simple)
                 if (tipo === 'C') {
-                    conceptos[campos[1]] = {
-                        codigo: campos[1],
-                        unidad: campos[2],
-                        resumen: campos[3],
-                        precio: parseFloat(campos[4].replace(',', '.')) || 0
+                    // ~C|Código|Unidad|Resumen|Precio|Tipo|
+                    conceptos[campos[0]] = {
+                        codigo: campos[0],
+                        unidad: campos[1] || '',
+                        resumen: campos[2] || '',
+                        precio: parseFloat(campos[3].replace(',', '.')) || 0,
+                        tipo: parseInt(campos[4]) || 0, // 3=Partida, 2=Capítulo (normalmente)
+                        hijos: [],
                     };
                 } 
-                // Registro ~D: Descomposición (Relación Padre -> Hijos)
                 else if (tipo === 'D') {
-                    const padre = campos[1];
-                    jerarquia[padre] = [];
+                    // ~D|Padre|Hijo1\Rend1|Hijo2\Rend2...|
+                    const padre = campos[0];
+                    if (!jerarquia[padre]) jerarquia[padre] = [];
                     
-                    // A partir del índice 2 están los hijos. En FIEBDC-3 se separan subcampos por '\'
-                    for (let i = 2; i < campos.length; i++) {
+                    for (let i = 1; i < campos.length; i++) {
                         if (campos[i]) {
                             const datosHijo = campos[i].split('\\');
                             const codigoHijo = datosHijo[0];
-                            jerarquia[padre].push(codigoHijo);
+                            jerarquia[padre].push({
+                                codigo: codigoHijo,
+                                rendimiento: parseFloat((datosHijo[1] || '1').replace(',', '.'))
+                            });
                             hijosSet.add(codigoHijo);
+                        }
+                    }
+                }
+                else if (tipo === 'T') {
+                    // ~T|Código|Texto largo...|
+                    textosLargos[campos[0]] = campos[1];
+                }
+                else if (tipo === 'M') {
+                    // ~M|Código|Ud|Tot|Comentario\U\L\A\H|Comentario\U\L\A\H...|
+                    const codigo = campos[0];
+                    if (!mediciones[codigo]) mediciones[codigo] = [];
+
+                    for (let i = 3; i < campos.length; i++) {
+                        if (campos[i]) {
+                            const cota = campos[i].split('\\');
+                            // Comentario\Unidades\Longitud\Anchura\Altura
+                            mediciones[codigo].push({
+                                comentario: cota[0] || '',
+                                u: parseFloat((cota[1] || '0').replace(',', '.')),
+                                l: parseFloat((cota[2] || '0').replace(',', '.')),
+                                a: parseFloat((cota[3] || '0').replace(',', '.')),
+                                h: parseFloat((cota[4] || '0').replace(',', '.'))
+                            });
                         }
                     }
                 }
             });
 
-            // Encontrar la raíz (el nodo que es padre pero nunca aparece como hijo)
-            let nodoRaiz = null;
+            // Encontrar Raíz (nodos que son padres pero nunca hijos)
+            let nodosRaiz = [];
             for (const padre in jerarquia) {
-                if (!hijosSet.has(padre)) {
-                    nodoRaiz = padre;
-                    break;
-                }
+                if (!hijosSet.has(padre)) nodosRaiz.push(padre);
             }
 
-            return { conceptos, jerarquia, nodoRaiz };
+            // Si no hay estructura jerárquica clara, listar todos los conceptos como raíz
+            if (nodosRaiz.length === 0) {
+                nodosRaiz = Object.keys(conceptos).filter(c => conceptos[c].unidad === ''); // Capítulos asumiendo Ud vacía
+                if(nodosRaiz.length === 0) nodosRaiz = Object.keys(conceptos);
+            }
+
+            return { conceptos, jerarquia, mediciones, textosLargos, nodosRaiz };
         }
 
-        function renderizarArbol(data) {
-            treeRoot.innerHTML = ''; // Limpiar árbol anterior
+        // --- RENDERIZADO VISUAL PROFESIONAL ---
+        function renderizarArbolProfesional(data) {
+            treeRoot.innerHTML = '';
 
-            function crearNodo(codigo) {
+            function crearNodoDOM(codigo, rendimientoPadre = 1) {
                 const concepto = data.conceptos[codigo];
                 if (!concepto) return null;
 
                 const hijos = data.jerarquia[codigo] || [];
-                const esHoja = hijos.length === 0;
-
-                // Crear contenedor <details>
-                const details = document.createElement('details');
-                if (esHoja) {
-                    details.classList.add('is-leaf');
+                const esCapitulo = hijos.length > 0;
+                
+                // Cálculo de Importe
+                let cantidad, importe;
+                if (esCapitulo) {
+                    // Para capítulos, la cantidad suele ser 1 en el nivel actual, y el importe la suma.
+                    cantidad = rendementPadre; // O 1 si es raíz absoluta
+                    // IMPORTANTE: Un visor real calcularía la suma de los hijos aquí.
+                    // Para esta versión funcional, mostramos el precio total si viene en el C del Capítulo.
+                    importe = concepto.precio; 
                 } else {
-                    // Por defecto, abrimos solo el primer nivel (Raíz)
-                    if (codigo === data.nodoRaiz) details.open = true;
+                    cantidad = rendimientoPadre; // Rendimiento/Medición de la partida
+                    importe = cantidad * concepto.precio;
                 }
 
-                // Crear cabecera <summary>
-                const summary = document.createElement('summary');
-                
-                // Formatear precio
-                const precioFormateado = new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(concepto.precio);
+                const details = document.createElement('details');
+                details.classList.add(esCapitulo ? 'node-chapter' : 'node-item');
 
+                // Si es Capítulo Raíz, lo abrimos por defecto
+                if (data.nodosRaiz.includes(codigo)) details.open = true;
+
+                // Cabecera Summary (La Fila de Datos)
+                const summary = document.createElement('summary');
                 summary.innerHTML = `
-                    <span class="item-icon"></span>
-                    <span class="item-code">${concepto.codigo}</span>
-                    <span class="item-desc" title="${concepto.resumen}">${concepto.resumen}</span>
-                    <span class="item-unit">${concepto.unidad || ''}</span>
-                    <span class="item-price">${precioFormateado}</span>
+                    <span class="node-icon col"></span>
+                    <span class="col-code col" title="${concepto.codigo}">${concepto.codigo}</span>
+                    <span class="col-desc col" title="${concepto.resumen}">${concepto.resumen}</span>
+                    <span class="col-unit col">${concepto.unidad}</span>
+                    <span class="col-qty col">${esCapitulo ? '' : formatNumber.format(cantidad)}</span>
+                    <span class="col-price col">${esCapitulo ? '' : formatEuro.format(concepto.precio)}</span>
+                    <span class="col-amount col">${formatEuro.format(importe)}</span>
                 `;
                 details.appendChild(summary);
 
-                // Recursividad: Crear hijos
-                if (!esHoja) {
-                    // Prevenir que un click en un padre vacío haga cosas raras
-                    const childrenContainer = document.createElement('div');
-                    hijos.forEach(hijoCodigo => {
-                        const nodoHijo = crearNodo(hijoCodigo);
-                        if (nodoHijo) childrenContainer.appendChild(nodoHijo);
+                // Contenido Expandible
+                if (esCapitulo) {
+                    // Es un capítulo: Renderizar sub-nodos recursivamente
+                    hijos.forEach(hijoData => {
+                        const subNodo = crearNodoDOM(hijoData.codigo, hijoData.rendimiento);
+                        if (subNodo) details.appendChild(subNodo);
                     });
-                    details.appendChild(childrenContainer);
                 } else {
-                    // Si es hoja, deshabilitar el click para que no intente expandirse
-                    summary.style.pointerEvents = 'none';
+                    // Es una partida final: Renderizar Panel de Detalles (M, T, Descomposición)
+                    details.classList.add('item-leaf-marker'); // Para quitar el icono de flecha
+                    
+                    const panel = document.createElement('div');
+                    panel.classList.add('item-details-panel');
+
+                    // 1. Texto Largo (~T)
+                    if (data.textosLargos[codigo]) {
+                        panel.innerHTML += `
+                            <div class="detail-section">
+                                <div class="detail-header">Descripción Técnica Completa</div>
+                                <div class="long-description">${data.textosLargos[codigo]}</div>
+                            </div>
+                        `;
+                    }
+
+                    // 2. Mediciones Detalladas (~M)
+                    if (data.mediciones[codigo] && data.mediciones[codigo].length > 0) {
+                        let htmlM = `
+                            <div class="detail-section">
+                                <div class="detail-header">Desglose de Medición</div>
+                                <table class="measurements-table">
+                                    <thead><tr><th>Comentario</th><th>Uds</th><th>Long</th><th>Anch</th><th>Alt</th><th>Total</th></tr></thead>
+                                    <tbody>
+                        `;
+                        
+                        let totalCalculado = 0;
+                        data.mediciones[codigo].forEach(m => {
+                            const subtotal = m.u * m.l * m.a * m.h;
+                            totalCalculado += subtotal;
+                            htmlM += `
+                                <tr>
+                                    <td>${m.comentario}</td>
+                                    <td class="num">${m.u}</td>
+                                    <td class="num">${m.l}</td>
+                                    <td class="num">${m.a}</td>
+                                    <td class="num">${m.h}</td>
+                                    <td class="num total">${subtotal.toFixed(3)}</td>
+                                </tr>
+                            `;
+                        });
+                        
+                        htmlM += `</tbody></table></div>`;
+                        panel.innerHTML += htmlM;
+                    }
+
+                    // 3. Descomposición de Precio (Si existe jerarquía interna sin Ud)
+                    // (Omitido en esta versión para mantener el enfoque en M y T, pero es la misma lógica recursiva)
+
+                    if(panel.children.length > 0) {
+                        // Solo añadimos el panel si tiene contenido
+                        details.appendChild(panel);
+                        // Reactivamos el click para abrir el detalle de la partida
+                        summary.style.pointerEvents = 'auto'; 
+                        details.classList.remove('item-leaf-marker');
+                    }
                 }
 
                 return details;
             }
 
-            if (data.nodoRaiz) {
-                const domArbol = crearNodo(data.nodoRaiz);
-                treeRoot.appendChild(domArbol);
-            } else {
-                treeRoot.innerHTML = '<p style="color:red;">Error: No se pudo determinar la raíz del presupuesto. El archivo podría estar corrupto.</p>';
-            }
+            // Iniciar renderizado desde las raíces detectadas
+            data.nodosRaiz.forEach(raizCodigo => {
+                const domRaiz = crearNodoDOM(raizCodigo);
+                if (domRaiz) treeRoot.appendChild(domRaiz);
+            });
         }
     </script>
 </body>
