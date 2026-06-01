@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visor de Presupuestos BC3 - V2</title>
+    <style>
+        :root {
+            --primary: #2c3e50;
+            --border: #bdc3c7;
+            --bg-light: #f8f9fa;
+            --hover: #e9ecef;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+            background-color: #fff;
+            color: #333;
+        }
+        #toolbar {
+            position: absolute;
+            top: 0;
+            width: 100%;
+            height: 50px;
+            background-color: var(--primary);
+            color: white;
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            box-sizing: border-box;
+            z-index: 10;
+        }
+        #toolbar input[type="file"] {
+            margin-left: 20px;
+            color: white;
+        }
+        #container {
+            display: flex;
+            width: 100%;
+            margin-top: 50px;
+            height: calc(100vh - 50px);
+        }
+        #sidebar {
+            width: 35%;
+            min-width: 250px;
+            border-right: 1px solid var(--border);
+            background-color: var(--bg-light);
+            overflow-y: auto;
+            padding: 15px;
+            box-sizing: border-box;
+        }
+        #main-panel {
+            flex: 1;
+            padding: 25px;
+            overflow-y: auto;
+            box-sizing: border-box;
+        }
+        ul {
+            list-style-type: none;
+            padding-left: 20px;
+            margin: 5px 0;
+        }
+        #tree-root { padding-left: 0; }
+        
+        .tree-node {
+            margin: 4px 0;
+            white-space: nowrap;
+        }
+        .node-content {
+            cursor: pointer;
+            padding: 4px 6px;
+            border-radius: 4px;
+            display: inline-block;
+            font-size: 14px;
+        }
+        .node-content:hover { background-color: var(--hover); }
+        .node-content.selected {
+            background-color: #3498db;
+            color: white;
+        }
+        .caret {
+            cursor: pointer;
+            user-select: none;
+            display: inline-block;
+            width: 16px;
+            text-align: center;
+            color: #7f8c8d;
+            font-size: 12px;
+        }
+        .caret::before { content: "\25B6"; }
+        .caret-down::before { content: "\25BC"; }
+        
+        .nested { display: none; }
+        .active { display: block; }
+
+        .detail-group { margin-bottom: 20px; }
+        .detail-group label {
+            display: block;
+            font-size: 12px;
+            color: #7f8c8d;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+        .detail-value {
+            font-size: 16px;
+            padding: 8px;
+            background-color: var(--bg-light);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        th, td {
+            border: 1px solid var(--border);
+            padding: 8px;
+            text-align: left;
+            font-size: 14px;
+        }
+        th { background-color: var(--hover); }
+    </style>
+</head>
+<body>
+
+    <div id="toolbar">
+        <strong>Visor BC3</strong>
+        <input type="file" id="fileInput" accept=".bc3">
+    </div>
+
+    <div id="container">
+        <div id="sidebar">
+            <ul id="tree-root">
+                <li style="color: #7f8c8d; font-size: 14px;">Carga un archivo .bc3 para visualizar el presupuesto.</li>
+            </ul>
+        </div>
+        <div id="main-panel">
+            <h2 style="margin-top: 0; color: var(--primary);">Detalles de la Partida</h2>
+            <div id="details-container" style="display: none;">
+                <div class="detail-group">
+                    <label>Código</label>
+                    <div class="detail-value" id="det-code"></div>
+                </div>
+                <div class="detail-group">
+                    <label>Resumen</label>
+                    <div class="detail-value" id="det-summary"></div>
+                </div>
+                <div style="display: flex; gap: 20px;">
+                    <div class="detail-group" style="flex: 1;">
+                        <label>Unidad</label>
+                        <div class="detail-value" id="det-unit"></div>
+                    </div>
+                    <div class="detail-group" style="flex: 1;">
+                        <label>Precio</label>
+                        <div class="detail-value" id="det-price"></div>
+                    </div>
+                </div>
+                <div class="detail-group">
+                    <label>Descripción Larga</label>
+                    <div class="detail-value" id="det-desc" style="white-space: pre-wrap; min-height: 80px;"></div>
+                </div>
+                
+                <div class="detail-group" id="descomposicion-group">
+                    <label>Descomposición (Medición / Rendimiento)</label>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Código</th>
+                                <th>Resumen</th>
+                                <th>Ud.</th>
+                                <th>Cantidad</th>
+                                <th>Precio</th>
+                                <th>Importe</th>
+                            </tr>
+                        </thead>
+                        <tbody id="det-table-body">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let db = { concepts: {}, root: null };
+
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.readAsText(file, 'windows-1252');
+            reader.onload = function(e) {
+                parseBC3(e.target.result);
+                renderTree();
+            };
+        });
+
+        function parseBC3(content) {
+            db.concepts = {};
+            db.root = null;
+            const decompositions = [];
+            const isChild = new Set();
+            
+            // 1. Limpiar caracteres extraños al inicio (BOM) que rompen la lectura
+            content = content.replace(/^\uFEFF/, '').trim();
+            
+            // 2. Agrupar registros manejando textos multilínea
+            const lines = content.split(/\r?\n/);
+            const records = [];
+            let currentRecord = "";
+            
+            lines.forEach(line => {
+                let tLine = line.trim();
+                // Si la línea empieza por ~ y una letra/símbolo, es un nuevo registro
+                if (/^~[A-Z0-9@]/.test(tLine)) {
+                    if (currentRecord !== "") records.push(currentRecord);
+                    currentRecord = tLine;
+                } else {
+                    currentRecord += "\n" + tLine;
+                }
+            });
+            if (currentRecord !== "") records.push(currentRecord);
+
+            // 3. Procesar los registros limpios
+            records.forEach(record => {
+                const parts = record.split('|');
+                const type = parts[0].trim();
+
+                if (type === '~C') {
+                    const code = parts[1] ? parts[1].trim() : null;
+                    if (!code) return;
+                    
+                    db.concepts[code] = {
+                        code: code,
+                        unit: parts[2] ? parts[2].trim() : '',
+                        summary: parts[3] ? parts[3].trim() : '',
+                        price: parseFloat((parts[4] || '0').replace(',', '.')) || 0,
+                        children: [],
+                        description: ''
+                    };
+                } 
+                else if (type === '~D') {
+                    const parent = parts[1] ? parts[1].trim() : null;
+                    if (!parent) return;
+                    
+                    let childrenString = parts[2] || '';
+                    // Eliminar la barra invertida final si el archivo la incluye por error
+                    if (childrenString.endsWith('\\')) {
+                        childrenString = childrenString.slice(0, -1);
+                    }
+                    
+                    const childrenData = childrenString.split('\\');
+                    for (let i = 0; i < childrenData.length; i += 2) {
+                        const childCode = childrenData[i] ? childrenData[i].trim() : null;
+                        const factor = parseFloat((childrenData[i+1] || '1').replace(',', '.')) || 0;
+                        if (childCode) {
+                            decompositions.push({ parent, child: childCode, factor });
+                            isChild.add(childCode);
+                        }
+                    }
+                }
+                else if (type === '~T') {
+                    const code = parts[1] ? parts[1].trim() : null;
+                    let text = parts[2] || '';
+                    if (code && db.concepts[code]) {
+                        db.concepts[code].description = text.replace(/\\n/g, '\n');
+                    }
+                }
+            });
+
+            // 4. Construir la jerarquía del árbol
+            decompositions.forEach(dec => {
+                if (db.concepts[dec.parent] && db.concepts[dec.child]) {
+                    db.concepts[dec.parent].children.push({
+                        concept: db.concepts[dec.child],
+                        factor: dec.factor
+                    });
+                }
+            });
+
+            // 5. Búsqueda inteligente de la raíz
+            // La raíz es un concepto que tiene hijos, pero que NUNCA aparece como hijo de otro.
+            const possibleRoots = Object.keys(db.concepts).filter(code => 
+                db.concepts[code].children.length > 0 && !isChild.has(code)
+            );
+
+            if (possibleRoots.length > 0) {
+                db.root = possibleRoots[0];
+            } else {
+                // Si el archivo está mal formado, mostramos el primer concepto que encontremos
+                const allCodes = Object.keys(db.concepts);
+                db.root = allCodes.length > 0 ? allCodes[0] : null;
+            }
+        }
+
+        function renderTree() {
+            const treeRoot = document.getElementById('tree-root');
+            treeRoot.innerHTML = '';
+            
+            if (!db.root || !db.concepts[db.root]) {
+                treeRoot.innerHTML = '<li>Error al leer la estructura del archivo. Revisa el formato.</li>';
+                return;
+            }
+
+            const rootEl = createTreeNode(db.concepts[db.root]);
+            treeRoot.appendChild(rootEl);
+            
+            // Auto-desplegar y seleccionar la raíz
+            const rootCaret = rootEl.querySelector('.caret');
+            if (rootCaret && rootCaret.style.visibility !== 'hidden') {
+                rootCaret.click();
+            }
+            rootEl.querySelector('.node-content').click();
+        }
+
+        function createTreeNode(concept) {
+            const li = document.createElement('li');
+            li.className = 'tree-node';
+
+            const hasChildren = concept.children.length > 0;
+            
+            const caret = document.createElement('span');
+            caret.className = 'caret'; 
+            if(!hasChildren) caret.style.visibility = 'hidden';
+
+            const content = document.createElement('div');
+            content.className = 'node-content';
+            content.textContent = `${concept.code} - ${concept.summary}`;
+            
+            li.appendChild(caret);
+            li.appendChild(content);
+
+            if (hasChildren) {
+                const ul = document.createElement('ul');
+                ul.className = 'nested';
+                concept.children.forEach(child => {
+                    ul.appendChild(createTreeNode(child.concept));
+                });
+                li.appendChild(ul);
+
+                caret.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    this.classList.toggle('caret-down');
+                    ul.classList.toggle('active');
+                });
+            }
+
+            content.addEventListener('click', function(e) {
+                e.stopPropagation();
+                document.querySelectorAll('.node-content').forEach(el => el.classList.remove('selected'));
+                this.classList.add('selected');
+                showDetails(concept);
+            });
+
+            return li;
+        }
+
+        function showDetails(concept) {
+            document.getElementById('details-container').style.display = 'block';
+            
+            document.getElementById('det-code').textContent = concept.code;
+            document.getElementById('det-summary').textContent = concept.summary;
+            document.getElementById('det-unit').textContent = concept.unit;
+            
+            const formatter = new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' });
+            document.getElementById('det-price').textContent = formatter.format(concept.price);
+            document.getElementById('det-desc').textContent = concept.description || 'Sin descripción detallada.';
+
+            const tbody = document.getElementById('det-table-body');
+            tbody.innerHTML = '';
+            
+            if (concept.children.length > 0) {
+                document.getElementById('descomposicion-group').style.display = 'block';
+                concept.children.forEach(child => {
+                    const tr = document.createElement('tr');
+                    const c = child.concept;
+                    const importe = child.factor * c.price;
+                    
+                    tr.innerHTML = `
+                        <td>${c.code}</td>
+                        <td>${c.summary}</td>
+                        <td>${c.unit}</td>
+                        <td>${child.factor.toLocaleString('es-ES', {minimumFractionDigits: 2, maximumFractionDigits: 3})}</td>
+                        <td>${formatter.format(c.price)}</td>
+                        <td><strong>${formatter.format(importe)}</strong></td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } else {
+                document.getElementById('descomposicion-group').style.display = 'none';
+            }
+        }
+    </script>
+</body>
+</html>
