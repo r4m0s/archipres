@@ -1,0 +1,1378 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Visor BC3 y BIM — Comparador y Editor</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#f4f6f9;--surface:#fff;--surface2:#f0f2f5;--border:#e2e6ed;--text:#1a1d23;--muted:#6b7280;--accent:#2563eb;--accent-bg:#eff4ff;--green:#16a34a;--green-bg:#f0fdf4;--amber:#d97706;--amber-bg:#fffbeb;--shadow:0 1px 3px rgba(0,0,0,.08);--font:'Segoe UI',system-ui,Arial,sans-serif;--col-a:#2563eb;--col-a-bg:#eff4ff;--col-a-border:#bfdbfe;--col-b:#7c3aed;--col-b-bg:#f5f3ff;--col-b-border:#ddd6fe;}
+body{font-family:var(--font);background:var(--bg);color:var(--text);font-size:13.5px;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+header{background:var(--surface);border-bottom:1px solid var(--border);padding:0 16px;height:52px;display:flex;align-items:center;gap:10px;flex-shrink:0;box-shadow:var(--shadow)}
+.logo{font-weight:700;font-size:15px;display:flex;align-items:center;gap:8px;color:var(--text)}
+.logo svg{color:var(--accent)}
+.hdr-file{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px}
+.hdr-actions{margin-left:auto;display:flex;gap:6px;align-items:center}
+.btn{display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:6px;font-size:12.5px;font-family:inherit;font-weight:500;cursor:pointer;border:1px solid var(--border);background:var(--surface);color:var(--muted);transition:.15s;white-space:nowrap}
+.btn:hover{background:var(--surface2);color:var(--text)}
+.btn-primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn-primary:hover{background:#1d4ed8;border-color:#1d4ed8}
+.btn-bim{background:#f0f9ff;border-color:#bae6fd;color:#0284c7;font-weight:600}
+.btn-bim:hover{background:#e0f2fe;border-color:#7dd3fc}
+.btn-compare{background:var(--col-b-bg);border-color:var(--col-b-border);color:var(--col-b);font-weight:600}
+.btn-compare:hover,.btn-compare.active{background:var(--col-b);color:#fff;border-color:var(--col-b)}
+.btn-danger { background:#fef2f2; border-color:#fca5a5; color:#dc2626; }
+.btn-danger:hover { background:#dc2626; color:#fff; }
+.btn-success { background:var(--green); border-color:var(--green); color:#fff; }
+.btn-success:hover { background:#15803d; border-color:#15803d; }
+.mode-badge{display:none;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;background:linear-gradient(90deg,var(--col-a-bg),var(--col-b-bg));border:1px solid var(--col-b-border);color:var(--col-b)}
+.mode-badge.show{display:inline-flex}
+/* Form Styles for Edit */
+.form-input { width:100%; border:1px solid var(--border); border-radius:4px; padding:8px 10px; font-family:inherit; font-size:12px; outline:none; transition: .2s; }
+.form-input:focus { border-color:var(--accent); box-shadow: 0 0 0 2px var(--accent-bg); }
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+/* Single layout */
+.main{display:flex;flex:1;overflow:hidden}
+.sidebar{width:400px;flex-shrink:0;display:flex;flex-direction:column;border-right:1px solid var(--border);background:var(--surface)}
+.detail{flex:1;min-width:300px;display:flex;flex-direction:column;overflow:hidden;background:var(--surface)}
+/* IFC Pane */
+.ifc-pane{width:420px;flex-shrink:0;display:none;flex-direction:column;border-left:1px solid var(--border);background:var(--surface);position:relative}
+.ifc-pane.show{display:flex}
+/* Compare layout */
+.compare-layout{display:none;flex:1;overflow:hidden}
+.compare-layout.show{display:flex}
+.col-pane{flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden;background:var(--surface);border-right:1px solid var(--border)}
+.col-pane:last-of-type{border-right:none}
+.col-hdr{padding:6px 12px;display:flex;align-items:center;gap:8px;flex-shrink:0;border-bottom:2px solid}
+.col-hdr.a{border-bottom-color:var(--col-a)}
+.col-hdr.b{border-bottom-color:var(--col-b)}
+.col-badge{font-size:10px;font-weight:800;letter-spacing:.4px;padding:2px 7px;border-radius:10px}
+.col-badge.a{background:var(--col-a-bg);color:var(--col-a);border:1px solid var(--col-a-border)}
+.col-badge.b{background:var(--col-b-bg);color:var(--col-b);border:1px solid var(--col-b-border)}
+.col-fname{font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.col-total{font-size:12px;font-weight:700;white-space:nowrap}
+.col-total.a{color:var(--col-a)}
+.col-total.b{color:var(--col-b)}
+.col-actions{display:flex;gap:4px;flex-shrink:0}
+.col-btn{display:inline-flex;align-items:center;gap:3px;padding:3px 8px;border-radius:5px;font-size:11px;font-family:inherit;font-weight:500;cursor:pointer;border:1px solid var(--border);background:var(--surface);color:var(--muted);transition:.15s}
+.col-btn:hover{background:var(--surface2);color:var(--text)}
+/* Compare right panel */
+.cmp-detail{width:370px;flex-shrink:0;display:flex;flex-direction:column;overflow:hidden;background:var(--surface);border-left:1px solid var(--border)}
+.cmp-detail-hdr{padding:10px 16px;border-bottom:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;gap:8px}
+.cmp-detail-hdr h3{font-size:13px;font-weight:700;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cmp-detail-body{flex:1;overflow-y:auto;padding:14px 16px;display:flex;flex-direction:column;gap:12px}
+.cmp-detail-body::-webkit-scrollbar{width:4px}
+.cmp-detail-body::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.cmp-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:24px;text-align:center;color:var(--muted);flex:1}
+/* Price compare card */
+.pcc{border-radius:10px;overflow:hidden;border:1px solid var(--border)}
+.pcc-row{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;gap:8px}
+.pcc-row.a{background:var(--col-a-bg);border-bottom:1px solid var(--col-a-border)}
+.pcc-row.b{background:var(--col-b-bg);border-bottom:1px solid var(--col-b-border)}
+.pcc-row.diff{background:#fff;border-top:2px solid var(--border)}
+.pcc-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px}
+.pcc-lbl.a{color:var(--col-a)}
+.pcc-lbl.b{color:var(--col-b)}
+.pcc-val{font-size:16px;font-weight:800}
+.pcc-val.a{color:var(--col-a)}
+.pcc-val.b{color:var(--col-b)}
+.diff-badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:10px;font-size:10.5px;font-weight:700}
+.diff-badge.cheaper{background:var(--green-bg);color:var(--green)}
+.diff-badge.dearer{background:#fef2f2;color:#dc2626}
+.diff-badge.equal{background:var(--surface2);color:var(--muted)}
+.diff-val{font-size:14px;font-weight:800}
+.diff-val.cheaper{color:var(--green)}
+.diff-val.dearer{color:#dc2626}
+.diff-val.equal{color:var(--muted)}
+/* Summary box */
+.cmp-box{border-radius:8px;border:1px solid var(--border);overflow:hidden}
+.cmp-box-title{padding:7px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);background:var(--surface2);border-bottom:1px solid var(--border)}
+.diff-bar-wrap{border-radius:8px;border:1px solid var(--border);padding:11px 13px;background:var(--surface)}
+.diff-bar-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:7px}
+.diff-bar-track{height:18px;background:#e5e7eb;border-radius:9px;overflow:hidden;display:flex}
+.diff-bar-a{height:100%;background:var(--col-a)}
+.diff-bar-b{height:100%;background:var(--col-b)}
+.diff-bar-labels{display:flex;justify-content:space-between;margin-top:4px;font-size:10.5px}
+/* Drop zone */
+.dropzone{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:40px;cursor:pointer;transition:.2s}
+.dropzone:hover,.dropzone.over{background:var(--accent-bg)}
+.dropzone.over{outline:2px dashed var(--accent);outline-offset:-4px}
+.col-dropzone{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:11px;padding:30px;cursor:pointer;transition:.2s}
+.col-dropzone:hover,.col-dropzone.over{background:var(--accent-bg)}
+.col-dropzone.over{outline:2px dashed var(--accent);outline-offset:-4px}
+.col-dropzone.b:hover,.col-dropzone.b.over{background:var(--col-b-bg)}
+.col-dropzone.b.over{outline-color:var(--col-b)}
+.drop-icon{width:44px;height:44px;border-radius:10px;background:var(--surface2);display:flex;align-items:center;justify-content:center;color:var(--muted)}
+.drop-title{font-weight:600;font-size:14px;text-align:center}
+.drop-sub{font-size:12px;color:var(--muted);text-align:center;max-width:200px}
+.drop-link{font-size:11.5px;font-weight:600;color:var(--accent)}
+.drop-link.b{color:var(--col-b)}
+input[type=file]{display:none}
+/* Toolbar */
+.toolbar{padding:8px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-shrink:0}
+.search-wrap{flex:1;display:flex;align-items:center;gap:6px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:4px 10px}
+.search-wrap input{border:none;background:transparent;outline:none;font-size:12.5px;width:100%;font-family:inherit;color:var(--text)}
+.search-wrap svg{color:var(--muted);flex-shrink:0}
+.icon-btn{width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:5px;border:1px solid var(--border);background:var(--surface);cursor:pointer;color:var(--muted);transition:.15s}
+.icon-btn:hover{background:var(--surface2);color:var(--text)}
+/* Tree */
+.tree-scroll{flex:1;overflow-y:auto;overflow-x:hidden}
+.tree-scroll::-webkit-scrollbar{width:5px}
+.tree-scroll::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+.node{user-select:none}
+.row{display:flex;align-items:center;cursor:pointer;transition:background .1s;position:relative;border-bottom:1px solid transparent;min-height:32px}
+.row:hover{background:var(--surface2)}
+.row.active{background:#f0f4ff}
+.ch-strip{width:4px;flex-shrink:0;align-self:stretch;border-radius:0 2px 2px 0}
+.row-root .ch-strip{background:var(--text)}
+.row-leaf .ch-strip{background:transparent}
+.arrow{width:18px;height:18px;display:flex;align-items:center;justify-content:center;flex-shrink:0;color:var(--muted);transition:transform .15s}
+.arrow.open{transform:rotate(90deg)}
+.arrow.leaf{visibility:hidden}
+.ch-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-right:6px}
+.root-badge{font-size:9px;font-weight:800;background:var(--text);color:#fff;padding:2px 5px;border-radius:3px;flex-shrink:0;margin-right:6px;letter-spacing:.3px}
+.info{flex:1;min-width:0;padding:4px 4px 4px 0}
+.info-code{font-size:10px;font-weight:600;color:var(--muted);font-family:'Courier New',monospace;letter-spacing:.3px;line-height:1.2}
+.info-desc{font-size:12.5px;line-height:1.35;word-break:break-word}
+.info-desc mark{background:#fef08a;border-radius:2px;padding:0 1px}
+.info-desc.bold{font-weight:700;font-size:13px}
+.info-meta{display:flex;gap:5px;margin-top:2px;align-items:center;flex-wrap:wrap}
+.tag-unit{font-size:10px;font-weight:600;background:var(--accent-bg);color:var(--accent);padding:0 5px;border-radius:3px}
+.cost-col{flex-shrink:0;display:flex;flex-direction:column;align-items:flex-end;padding:4px 10px 4px 6px;gap:3px;min-width:80px}
+.cost-price{font-size:11px;font-weight:700;color:var(--text);white-space:nowrap}
+.cost-pct{font-size:10px;font-weight:600;color:var(--muted);white-space:nowrap}
+.pct-bar-wrap{width:60px;height:4px;background:#e5e7eb;border-radius:2px;overflow:hidden}
+.pct-bar{height:100%;border-radius:2px;transition:width .3s}
+.diff-strip{width:4px;flex-shrink:0;align-self:stretch}
+.children{display:none}
+.children.open{display:block}
+/* Statsbar */
+.statsbar{padding:5px 14px;border-top:1px solid var(--border);font-size:11.5px;color:var(--muted);display:flex;gap:14px;flex-wrap:wrap;flex-shrink:0;background:var(--surface2)}
+.statsbar strong{color:var(--text)}
+/* Detail single */
+.detail-hdr{padding:14px 18px 12px;border-bottom:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;gap:8px}
+.detail-hdr h3{font-size:13px;font-weight:700;flex:1}
+.detail-body{flex:1;overflow-y:auto;padding:16px 18px;display:flex;flex-direction:column;gap:16px}
+.detail-body::-webkit-scrollbar{width:4px}
+.detail-body::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.empty-state{flex:1;display:flex;flex-direction:column;overflow-y:auto;padding:16px 18px;gap:16px}
+/* Overview */
+.overview-title{font-size:14px;font-weight:700;color:var(--text)}
+.overview-sub{font-size:12px;color:var(--muted);margin-top:2px}
+.stack-bar{display:flex;height:28px;border-radius:8px;overflow:hidden;gap:2px;flex-shrink:0}
+.stack-seg{height:100%;transition:opacity .2s;cursor:pointer;position:relative}
+.stack-seg:hover{opacity:.85}
+.stack-seg[title]:hover::after{content:attr(title);position:absolute;top:calc(100% + 6px);left:50%;transform:translateX(-50%);background:#1a1d23;color:#fff;border-radius:4px;padding:4px 8px;font-size:11px;white-space:nowrap;z-index:99;pointer-events:none}
+.ch-table{width:100%;border-collapse:collapse;font-size:12px}
+.ch-table th{text-align:left;padding:5px 8px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);border-bottom:1px solid var(--border)}
+.ch-table td{padding:5px 8px;border-bottom:1px solid #f0f2f5;vertical-align:middle}
+.ch-table tr:hover td{background:var(--surface2)}
+.ch-table tr:last-child td{border-bottom:none}
+.ch-color-pill{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px}
+.ch-bar-cell{width:100px}
+.ch-bar-bg{height:6px;background:#e5e7eb;border-radius:3px;overflow:hidden}
+.ch-bar-fill{height:100%;border-radius:3px}
+/* Detail sections */
+.dl{display:flex;flex-direction:column;gap:5px}
+.dl-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted)}
+.dl-code{font-family:'Courier New',monospace;font-size:12px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--accent);font-weight:600}
+.dl-text{font-size:12px;color:var(--muted);background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;line-height:1.6}
+.price-card{border-radius:8px;padding:12px 16px;display:flex;justify-content:space-between;align-items:center}
+.price-card .pval{font-size:22px;font-weight:700}
+.price-card .punit{font-size:11px;color:var(--muted)}
+.t{width:100%;border-collapse:collapse;font-size:11.5px}
+.t th{background:var(--surface2);padding:5px 7px;text-align:left;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border);font-size:10px;text-transform:uppercase}
+.t td{padding:4px 7px;border-bottom:1px solid #f0f2f5;vertical-align:top}
+.t tr:hover td{background:var(--surface2)}
+.t.green th{background:var(--green-bg);color:var(--green)}
+.total-row{background:var(--accent-bg);padding:6px 10px;border-radius:6px;font-size:12px;font-weight:700;color:var(--accent);display:flex;justify-content:space-between}
+@media print{
+  header,.toolbar,.statsbar,.detail,.ifc-pane{display:none!important}
+  .sidebar{width:100%;border:none}
+  .children{display:block!important}
+  body{overflow:visible;height:auto}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+      <polyline points="14 2 14 8 20 8"/>
+      <line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
+    </svg>
+    Visor BC3
+    <span style="font-size:10px;font-weight:400;color:var(--muted)">FIEBDC-3</span>
+  </div>
+  <div class="hdr-file" id="hdrFile">Sin archivo cargado</div>
+  
+  <div class="hdr-actions">
+    <span class="mode-badge" id="modeBadge">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="7" height="18" rx="1"/><rect x="14" y="3" width="7" height="18" rx="1"/></svg>
+      Comparando
+    </span>
+    
+    <button class="btn" onclick="expandAllActive()">▾ Expandir</button>
+    <button class="btn" onclick="collapseAllActive()">▴ Contraer</button>
+    
+    <button class="btn" id="btnCSV" onclick="exportCSV()">↓ CSV</button>
+    <button class="btn" id="btnExcel" onclick="exportExcel()">↓ Excel</button>
+    <button class="btn" id="btnWord" onclick="exportWord()">↓ Word</button>
+
+    <button class="btn btn-bim" id="btnBim" onclick="toggleIfcMode()">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M12 18v-6"/><path d="M9 15h6"/></svg>
+      Módulo BIM (IFC)
+    </button>
+    
+    <button class="btn btn-compare" id="btnCompare" onclick="toggleCompareMode()">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="7" height="18" rx="1"/><rect x="14" y="3" width="7" height="18" rx="1"/></svg>
+      Comparar
+    </button>
+    
+    <button class="btn btn-primary" id="btnOpen" onclick="document.getElementById('fileInputA').click()">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+      </svg>
+      Abrir BC3
+    </button>
+    
+    <input type="file" id="fileInputA" accept=".bc3,.BC3,.txt" onchange="onFileInputA(event)">
+    <input type="file" id="fileInputB" accept=".bc3,.BC3,.txt" onchange="onFileInputB(event)">
+  </div>
+</header>
+
+<div class="main" id="singleLayout">
+  <div class="sidebar">
+    <div class="dropzone" id="dropzoneSingle"
+         ondragover="evDragOver(event,'dropzoneSingle')" ondragleave="evDragLeave('dropzoneSingle')" ondrop="evDropA(event,'dropzoneSingle')"
+         onclick="document.getElementById('fileInputA').click()">
+      <div class="drop-icon">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+        </svg>
+      </div>
+      <div class="drop-title">Arrastra un archivo BC3</div>
+      <div class="drop-sub">o haz clic para seleccionar</div>
+      <span class="drop-link">Examinar archivos</span>
+    </div>
+    <div class="toolbar" id="toolbarS" style="display:none">
+      <div class="search-wrap">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="searchS" placeholder="Buscar código o descripción…" oninput="onSearchSingle(this.value)">
+      </div>
+      <div class="icon-btn" onclick="document.getElementById('searchS').value='';onSearchSingle('')">✕</div>
+    </div>
+    <div class="tree-scroll" id="treeS" style="display:none"></div>
+    <div class="statsbar" id="statsS" style="display:none"></div>
+  </div>
+
+  <div class="detail">
+    <div class="detail-hdr"><h3 id="detailTitle">Resumen del proyecto</h3></div>
+    <div class="empty-state" id="emptyState"></div>
+    <div class="detail-body" id="detailBody" style="display:none"></div>
+  </div>
+
+  <div class="ifc-pane" id="ifcPane">
+     <div class="col-hdr" style="border-bottom-color:#0284c7">
+       <span class="col-badge" style="background:#e0f2fe;color:#0284c7;border-color:#bae6fd">BIM</span>
+       <span class="col-fname" id="ifcFname">Sin modelo cargado</span>
+       <div class="col-actions">
+         <button class="col-btn" onclick="document.getElementById('fileInputIfc').click()">Abrir Fichero IFC</button>
+         <button class="col-btn" onclick="toggleIfcMode()">✕</button>
+       </div>
+       <input type="file" id="fileInputIfc" accept=".ifc" style="display:none" onchange="onFileInputIfc(event)">
+     </div>
+     <div id="ifcContainer" style="flex:1; position:relative; background:#e2e6ed;">
+        <div id="ifcLoading" style="display:none; position:absolute; inset:0; background:rgba(255,255,255,0.85); z-index:10; align-items:center; justify-content:center; flex-direction:column; gap:10px;">
+            <div style="font-weight:800; font-size:15px; color:var(--accent)">Cargando motor BIM...</div>
+            <div style="font-size:11.5px; color:var(--muted)">Esto puede tardar según el tamaño del archivo</div>
+        </div>
+     </div>
+     <div id="ifcProps" style="height:280px; border-top:1px solid var(--border); overflow-y:auto; padding:14px; background:var(--surface2);">
+        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;text-align:center;color:var(--muted);gap:10px">
+           <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+           <div style="font-size:12px">Haz doble clic en un elemento del modelo 3D<br>para extraer sus mediciones.</div>
+        </div>
+     </div>
+  </div>
+</div>
+
+<div class="compare-layout" id="compareLayout">
+  <div class="col-pane">
+    <div class="col-hdr a">
+      <span class="col-badge a">A</span>
+      <span class="col-fname" id="fnameA">Sin archivo</span>
+      <span class="col-total a" id="totalA"></span>
+      <div class="col-actions">
+        <button class="col-btn" onclick="expandCol('A')">▾</button>
+        <button class="col-btn" onclick="collapseCol('A')">▴</button>
+        <button class="col-btn" onclick="document.getElementById('fileInputA').click()">Abrir</button>
+      </div>
+    </div>
+    <div class="toolbar" id="toolbarCA" style="display:none">
+      <div class="search-wrap">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="searchA" placeholder="Buscar en A…" oninput="onSearchCol(this.value,'A')">
+      </div>
+      <div class="icon-btn" onclick="document.getElementById('searchA').value='';onSearchCol('','A')">✕</div>
+    </div>
+    <div class="col-dropzone a" id="dropzoneA"
+         ondragover="evDragOver(event,'dropzoneA')" ondragleave="evDragLeave('dropzoneA')" ondrop="evDropA(event,'dropzoneA')"
+         onclick="document.getElementById('fileInputA').click()">
+      <div class="drop-title">Presupuesto A</div>
+      <span class="drop-link">Examinar archivos</span>
+    </div>
+    <div class="tree-scroll" id="treeA" style="display:none"></div>
+    <div class="statsbar" id="statsA" style="display:none"></div>
+  </div>
+
+  <div class="col-pane">
+    <div class="col-hdr b">
+      <span class="col-badge b">B</span>
+      <span class="col-fname" id="fnameB">Sin archivo</span>
+      <span class="col-total b" id="totalB"></span>
+      <div class="col-actions">
+        <button class="col-btn" onclick="expandCol('B')">▾</button>
+        <button class="col-btn" onclick="collapseCol('B')">▴</button>
+        <button class="col-btn" onclick="document.getElementById('fileInputB').click()">Abrir</button>
+      </div>
+    </div>
+    <div class="toolbar" id="toolbarCB" style="display:none">
+      <div class="search-wrap">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="searchB" placeholder="Buscar en B…" oninput="onSearchCol(this.value,'B')">
+      </div>
+      <div class="icon-btn" onclick="document.getElementById('searchB').value='';onSearchCol('','B')">✕</div>
+    </div>
+    <div class="col-dropzone b" id="dropzoneB"
+         ondragover="evDragOver(event,'dropzoneB')" ondragleave="evDragLeave('dropzoneB')" ondrop="evDropB(event,'dropzoneB')"
+         onclick="document.getElementById('fileInputB').click()">
+      <div class="drop-title">Presupuesto B</div>
+      <span class="drop-link b">Examinar archivos</span>
+    </div>
+    <div class="tree-scroll" id="treeB" style="display:none"></div>
+    <div class="statsbar" id="statsB" style="display:none"></div>
+  </div>
+
+  <div class="cmp-detail">
+    <div class="cmp-detail-hdr"><h3 id="cmpTitle">Comparación</h3></div>
+    <div class="cmp-detail-body" id="cmpBody">
+      <div class="cmp-empty" id="cmpEmpty">
+        <div style="font-size:28px;opacity:.4">⚖️</div>
+        <div style="font-weight:600;font-size:13px;color:var(--text)">Comparador de precios</div>
+        <div style="font-size:12px">Carga dos archivos BC3 y haz clic en cualquier partida para comparar sus precios</div>
+      </div>
+      <div id="cmpContent" style="display:none;flex-direction:column;gap:12px"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// VARIABLES GLOBALES
+const PALETTE=['#2563eb','#16a34a','#d97706','#dc2626','#7c3aed','#0891b2','#be185d','#65a30d','#ea580c','#0d9488','#4f46e5','#b45309','#15803d','#c026d3','#0284c7','#9f1239','#92400e','#047857','#1e40af','#6d28d9'];
+const TYPE_LABELS={'0':'Sin clasificar','1':'Mano de obra','2':'Maquinaria','3':'Materiales','4':'Comp. residuo','5':'Clasif. residuo','EA':'Elemento auxiliar','EU':'Elemento unitario','EC':'Elemento complejo','EF':'Elemento funcional','OB':'Obra','PA':'Partida Alzada','PU':'Presupuesto Unit.'};
+
+let BC3=null, BC3A=null, BC3B=null;
+let metaS={}, metaA={}, metaB={};
+let cmpMode=false;
+
+// UTILIDADES
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function pf(s) { return parseFloat(String(s||'').trim().replace(',','.'))||0; }
+function isNum(s) { const t=String(s||'').trim(); return t!==''&&!isNaN(Number(t)); }
+function fmt(n,d=2) { return Number(n).toLocaleString('es-ES',{minimumFractionDigits:d,maximumFractionDigits:d}); }
+function fmtDate(s) {
+  s=(s||'').trim();
+  if(!s||s==='00000000') return '';
+  if(s.length===8) return s.slice(0,2)+'/'+s.slice(2,4)+'/'+s.slice(4);
+  if(s.length===6) { const y=parseInt(s.slice(4)); return s.slice(0,2)+'/'+s.slice(2,4)+'/'+(y>=80?1900+y:2000+y); }
+  return s;
+}
+function hexA(hex,a) {
+  const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
+  return `rgba(${r},${g},${b},${a})`;
+}
+
+// ── MOTOR FIEBDC-3 (RECALCULAR PROPAGACIÓN) ──
+function recalcBC3(bc) {
+  if(!bc || !bc.rootCode) return;
+  function r(cCode) {
+    const kids = bc.structure[cCode] || [];
+    if(kids.length > 0) {
+      let p = 0;
+      for(const k of kids) {
+        r(k.code);
+        const medKey = cCode + '::' + k.code;
+        const med = bc.mediciones[medKey];
+        let qty = (med && typeof med.total === 'number') ? med.total : ((k.factor !== undefined ? k.factor : 1) * (k.rend !== undefined ? k.rend : 0));
+        k.rend = qty;
+        k.factor = 1;
+        p += qty * (bc.concepts[k.code]?.price || 0);
+      }
+      if(bc.concepts[cCode]) bc.concepts[cCode].price = p;
+    }
+  }
+  r(bc.rootCode);
+}
+
+// PARSER FIEBDC-3
+function resolveCode(code,concepts) {
+  if(concepts[code]) return code;
+  if(concepts[code+'#']) return code+'#';
+  const s=code.replace(/#+$/,'');
+  if(s!==code&&concepts[s]) return s;
+  return code;
+}
+function parseDecomp(field) {
+  const tokens=field.split('\\').map(s=>s.trim());
+  const children=[];
+  let i=0;
+  while(i<tokens.length) {
+    const tok=tokens[i];
+    if(tok===''||isNum(tok)) { i++; continue; }
+    const code=tok; i++;
+    let factor=1, rend=1;
+    if(i<tokens.length) {
+      if(tokens[i]==='') {
+        i++;
+        if(i<tokens.length&&isNum(tokens[i])) { rend=pf(tokens[i]); i++; }
+      } else {
+        if(i<tokens.length&&isNum(tokens[i])) { factor=pf(tokens[i]); i++; }
+        if(i<tokens.length&&isNum(tokens[i])) { rend=pf(tokens[i]); i++; }
+      }
+    }
+    while(i<tokens.length&&tokens[i].includes(';')) i++;
+    children.push({code,factor,rend});
+  }
+  return children;
+}
+function parseMedicion(parts,mediciones,additive) {
+  const codePart=parts[1]||'';
+  const codeParts=codePart.split(/\\+/).map(s=>s.trim()).filter(Boolean);
+  const parentCode=codeParts.length>=2?codeParts[0]:'';
+  const conceptCode=codeParts.length>=2?codeParts[codeParts.length-1]:(codeParts[0]||'');
+  const total=pf(parts[3]);
+  const lines=[];
+  for(let j=4; j<parts.length-1; j++) {
+    const seg=(parts[j]||'').trim();
+    if(!seg) continue;
+    const cols=seg.split('\\').map(s=>s.trim());
+    lines.push({tipo:cols[0]||'',comment:cols[1]||'',n:cols[2]||'',l:cols[3]||'',a:cols[4]||'',h:cols[5]||''});
+  }
+  const key=parentCode+'::'+conceptCode;
+  if(additive&&mediciones[key]) { mediciones[key].lines.push(...lines); mediciones[key].total+=total; }
+  else mediciones[key]={lines,total};
+}
+function parseBC3(text) {
+  text=text.replace(/\r\n/g,'\n').replace(/\r/g,'\n');
+  const records=[];
+  let cur=null;
+  for(const rawLine of text.split('\n')) {
+    const t=rawLine.trimEnd(), trimmed=t.trimStart();
+    if(trimmed.startsWith('~')&&trimmed.length>=2) {
+      if(cur!==null) records.push(cur);
+      cur=trimmed;
+    } else if(cur!==null) cur+='\n'+t;
+  }
+  if(cur!==null) records.push(cur);
+
+  const concepts={}, structure={}, mediciones={}, techInfo={}, versionInfo={};
+  let rootCode=null, projectDesc='', coeff={CI:0,GG:0,BI:0,BAJA:0,IVA:0};
+
+  for(const rec of records) {
+    const clean=rec.replace(/\n/g,' ').replace(/\s+/g,' ').trim();
+    if(!clean.startsWith('~')) continue;
+    const parts=clean.slice(1).split('|');
+    const type=(parts[0]||'').trim().toUpperCase();
+
+    switch(type) {
+      case 'V':
+        const f=(parts[1]||'').split('\\').map(s=>s.trim());
+        versionInfo.version=f[0]||''; versionInfo.program=f[2]||''; versionInfo.owner=f[3]||''; break;
+      case 'K':
+        const cf=(parts[2]||'').split('\\').map(s=>s.trim());
+        coeff={CI:pf(cf[0]),GG:pf(cf[1]),BI:pf(cf[2]),BAJA:pf(cf[3]),IVA:pf(cf[4])}; break;
+      case 'C':
+        const codes=(parts[1]||'').split('\\').map(s=>s.trim()).filter(Boolean);
+        if(!codes.length) break;
+        const mainCode=codes[0];
+        const priceTokens=(parts[4]||'').split('\\').map(s=>s.trim()).filter(Boolean);
+        const prices=priceTokens.map(p=>pf(p));
+        const obj={code:mainCode,synonyms:codes.slice(1),unit:parts[2]||'',desc:parts[3]||'',text:'',prices,price:prices[0]||0,date:fmtDate((parts[5]||'').split('\\')[0]),typeStr:(parts[6]||'0').trim()};
+        concepts[mainCode]=obj;
+        for(const syn of codes.slice(1)) if(syn&&!concepts[syn]) concepts[syn]=obj;
+        if(!rootCode&&mainCode.endsWith('##')) { rootCode=mainCode; projectDesc=obj.desc; } break;
+      case 'D': case 'Y':
+        const parent=(parts[1]||'').trim();
+        if(!parent) break;
+        const decoStr=(parts[3]&&parts[3].trim())?parts[3]:(parts[2]||'');
+        const ch=parseDecomp(decoStr);
+        if(type==='Y'&&structure[parent]) structure[parent].push(...ch); else structure[parent]=ch; break;
+      case 'T':
+        const code=parts[1]||'';
+        const txt=parts.slice(2,parts.length-1).join('|').trim();
+        if(concepts[code]) concepts[code].text=txt; break;
+      case 'M': case 'N':
+        parseMedicion(parts,mediciones,type==='N'); break;
+      case 'X':
+        const xCode=parts[1]||'';
+        if(!xCode) break;
+        const info=techInfo[xCode]||{};
+        const toks=(parts[2]||'').split('\\').map(s=>s.trim());
+        for(let i=0; i+1<toks.length; i+=2) if(toks[i]) info[toks[i]]=toks[i+1];
+        if(info['eCO2']&&!info['GWP-total']) info['GWP-total']=info['eCO2'];
+        techInfo[xCode]=info; break;
+      case 'B':
+        const oldCode=parts[1]||'', newCode=(parts[2]||'').trim();
+        if(!oldCode) break;
+        if(newCode) {
+          if(concepts[oldCode]) { concepts[newCode]={...concepts[oldCode],code:newCode}; delete concepts[oldCode]; }
+          if(structure[oldCode]) { structure[newCode]=structure[oldCode]; delete structure[oldCode]; }
+          if(rootCode===oldCode) rootCode=newCode;
+        } else {
+          delete concepts[oldCode]; delete structure[oldCode];
+          if(rootCode===oldCode) rootCode=null;
+        } break;
+    }
+  }
+  if(!rootCode) {
+    const allCh=new Set(Object.values(structure).flat().map(c=>c.code));
+    for(const code of Object.keys(structure)) if(!allCh.has(code)&&concepts[code]) { rootCode=code; projectDesc=concepts[code].desc; break; }
+  }
+  for(const parent of Object.keys(structure)) {
+    structure[parent]=structure[parent].map(child=>({...child,code:resolveCode(child.code,concepts)}));
+  }
+  return {concepts,structure,mediciones,techInfo,rootCode,projectDesc,versionInfo,coeff};
+}
+
+// FILE LOAD
+function onFileInputA(e) { const f=e.target.files[0]; if(f) loadFileA(f); e.target.value=''; }
+function onFileInputB(e) { const f=e.target.files[0]; if(f) loadFileB(f); e.target.value=''; }
+function evDragOver(e,id) { e.preventDefault(); document.getElementById(id).classList.add('over'); }
+function evDragLeave(id) { document.getElementById(id).classList.remove('over'); }
+function evDropA(e,id) { e.preventDefault(); document.getElementById(id).classList.remove('over'); const f=e.dataTransfer.files[0]; if(f) loadFileA(f); }
+function evDropB(e,id) { e.preventDefault(); document.getElementById(id).classList.remove('over'); const f=e.dataTransfer.files[0]; if(f) loadFileB(f); }
+
+function loadFileA(file) {
+  const r=new FileReader();
+  r.onload=e=>{
+    try {
+      const d=parseBC3(e.target.result); d._filename=file.name;
+      recalcBC3(d);
+      if(cmpMode) { BC3A=d; computeMeta(BC3A,metaA); renderColA(); refreshCmpOverview(); }
+      else { BC3=d; computeMeta(BC3,metaS); renderSingle(); }
+    } catch(err) { alert('Error al parsear BC3:\n'+err.message); console.error(err); }
+  };
+  r.readAsText(file,'windows-1252');
+}
+
+function loadFileB(file) {
+  const r=new FileReader();
+  r.onload=e=>{
+    try {
+      BC3B=parseBC3(e.target.result); BC3B._filename=file.name;
+      recalcBC3(BC3B);
+      computeMeta(BC3B,metaB); renderColB(); refreshCmpOverview();
+    } catch(err) { alert('Error al parsear BC3:\n'+err.message); console.error(err); }
+  };
+  r.readAsText(file,'windows-1252');
+}
+
+// META
+function computeMeta(bc3,meta) {
+  for(const k in meta) delete meta[k];
+  if(!bc3||!bc3.rootCode) return;
+  const {concepts,structure,rootCode}=bc3;
+  const chapters=structure[rootCode]||[];
+  const totalPrice=concepts[rootCode]?.price||0;
+  chapters.forEach((ch,i)=>{
+    const c=concepts[ch.code]; if(!c) return;
+    const price=(c.price||0) * (ch.rend||1);
+    const pct=totalPrice>0?(price/totalPrice*100):0;
+    meta[ch.code]={color:PALETTE[i%PALETTE.length],pct,price,index:i};
+  });
+}
+
+// TOGGLE COMPARE
+function toggleCompareMode() {
+  cmpMode=!cmpMode;
+  const btn=document.getElementById('btnCompare'), badge=document.getElementById('modeBadge');
+  const sl=document.getElementById('singleLayout'), cl=document.getElementById('compareLayout'), bo=document.getElementById('btnOpen'), ifcBtn=document.getElementById('btnBim');
+  if(cmpMode) {
+    btn.classList.add('active'); badge.classList.add('show');
+    sl.style.display='none'; cl.classList.add('show'); bo.style.display='none'; ifcBtn.style.display='none';
+    if(BC3&&!BC3A) { BC3A=BC3; Object.assign(metaA,metaS); renderColA(); }
+    refreshCmpOverview();
+  } else {
+    btn.classList.remove('active'); badge.classList.remove('show');
+    sl.style.display='flex'; cl.classList.remove('show'); bo.style.display=''; ifcBtn.style.display='';
+    if(BC3A&&!BC3) { BC3=BC3A; Object.assign(metaS,metaA); renderSingle(); }
+  }
+}
+
+// RENDER SINGLE
+function renderSingle() {
+  if(!BC3) return;
+  const {concepts,structure,rootCode,projectDesc,versionInfo,coeff,_filename}=BC3;
+  document.getElementById('hdrFile').textContent=(projectDesc||_filename)+(versionInfo.version?' — '+versionInfo.version:'');
+  document.getElementById('dropzoneSingle').style.display='none';
+  document.getElementById('toolbarS').style.display='flex';
+  document.getElementById('treeS').style.display='block';
+  document.getElementById('statsS').style.display='flex';
+  const nC=Object.keys(structure).filter(c=>!c.endsWith('##')).length;
+  const nP=Object.values(concepts).filter(c=>!structure[c.code]||!structure[c.code].length).length;
+  let st=`<span><strong>${nC}</strong> cap.</span><span><strong>${nP}</strong> part.</span><span><strong>${Object.keys(concepts).length}</strong> conc.</span>`;
+  if(coeff.CI>0) st+=`<span>CI <strong>${coeff.CI}%</strong></span>`;
+  if(coeff.GG>0) st+=`<span>GG <strong>${coeff.GG}%</strong></span>`;
+  if(coeff.BI>0) st+=`<span>BI <strong>${coeff.BI}%</strong></span>`;
+  if(coeff.IVA>0) st+=`<span>IVA <strong>${coeff.IVA}%</strong></span>`;
+  document.getElementById('statsS').innerHTML=st;
+  if(!rootCode) { document.getElementById('treeS').innerHTML='<div style="padding:20px;color:var(--muted)">No se encontró estructura.</div>'; return; }
+  document.getElementById('treeS').innerHTML=buildNode(rootCode,0,'',null,BC3,metaS,'S');
+  renderOverview();
+}
+
+// RENDER COMPARE
+function renderColA() {
+  if(!BC3A) return;
+  const {concepts,structure,rootCode,projectDesc,_filename}=BC3A;
+  document.getElementById('dropzoneA').style.display='none';
+  document.getElementById('toolbarCA').style.display='flex';
+  document.getElementById('treeA').style.display='block';
+  document.getElementById('statsA').style.display='flex';
+  document.getElementById('fnameA').textContent=projectDesc||_filename;
+  const tot=concepts[rootCode]?.price||0;
+  document.getElementById('totalA').textContent=tot>0?fmt(tot)+' €':'';
+  if(!rootCode) { document.getElementById('treeA').innerHTML='<div style="padding:20px;color:var(--muted)">Sin estructura.</div>'; return; }
+  document.getElementById('treeA').innerHTML=buildNode(rootCode,0,'',null,BC3A,metaA,'A');
+  const nC=Object.keys(structure).filter(c=>!c.endsWith('##')).length;
+  const nP=Object.values(concepts).filter(c=>!structure[c.code]||!structure[c.code].length).length;
+  document.getElementById('statsA').innerHTML=`<span><strong>${nC}</strong> cap.</span><span><strong>${nP}</strong> part.</span><span><strong>${Object.keys(concepts).length}</strong> conc.</span>`;
+}
+function renderColB() {
+  if(!BC3B) return;
+  const {concepts,structure,rootCode,projectDesc,_filename}=BC3B;
+  document.getElementById('dropzoneB').style.display='none';
+  document.getElementById('toolbarCB').style.display='flex';
+  document.getElementById('treeB').style.display='block';
+  document.getElementById('statsB').style.display='flex';
+  document.getElementById('fnameB').textContent=projectDesc||_filename;
+  const tot=concepts[rootCode]?.price||0;
+  document.getElementById('totalB').textContent=tot>0?fmt(tot)+' €':'';
+  if(!rootCode) { document.getElementById('treeB').innerHTML='<div style="padding:20px;color:var(--muted)">Sin estructura.</div>'; return; }
+  document.getElementById('treeB').innerHTML=buildNode(rootCode,0,'',null,BC3B,metaB,'B');
+  const nC=Object.keys(structure).filter(c=>!c.endsWith('##')).length;
+  const nP=Object.values(concepts).filter(c=>!structure[c.code]||!structure[c.code].length).length;
+  document.getElementById('statsB').innerHTML=`<span><strong>${nC}</strong> cap.</span><span><strong>${nP}</strong> part.</span><span><strong>${Object.keys(concepts).length}</strong> conc.</span>`;
+}
+
+// BUILD TREE NODE
+function buildNode(code,depth,parentCode,parentChCode,bc3,meta,sfx) {
+  const {concepts,structure,mediciones}=bc3;
+  const concept=concepts[code]; if(!concept) return '';
+  const children=structure[code]||[];
+  const hasKids=children.length>0;
+  const isRoot=depth===0, isChapter=depth===1;
+  const sid='n'+sfx+'_'+code.replace(/[^a-zA-Z0-9]/g,'_');
+  const chCode=isChapter?code:parentChCode;
+  const color=isRoot?null:(chCode?meta[chCode]?.color:null);
+  const price=concept.price; const chMeta=isChapter?meta[code]:null;
+  const rowCls='row'+(isRoot?' row-root':isChapter?' row-chapter':'');
+  let stripStyle='background:transparent';
+  if(isRoot) stripStyle='background:#1a1d23';
+  else if(isChapter&&color) stripStyle=`background:${color}`;
+  else if(color) stripStyle=`background:${hexA(color,0.35)}`;
+  const arrowCls=hasKids?(isRoot?'arrow open':'arrow'):'arrow leaf';
+  const childrenCls=isRoot?'children open':'children';
+  const indentPx=Math.max(0,(depth-1)*16);
+
+  let clickAttr=`onclick="nodeClick(event,'${esc(code)}','${esc(parentCode)}','${sfx}')"`;
+  let diffStrip='';
+  if(sfx==='A'||sfx==='B') {
+    const otherBC3=sfx==='A'?BC3B:BC3A;
+    if(otherBC3) {
+      const oc=otherBC3.concepts[code];
+      if(oc&&price>0&&oc.price>0) {
+        const diff=sfx==='A'?(oc.price-price):(price-oc.price);
+        const cls=diff<-0.005?'#bbf7d0':diff>0.005?'#fecaca':'#e5e7eb';
+        diffStrip=`<div class="diff-strip" style="background:${cls}"></div>`;
+      }
+    }
+  }
+
+  let inner='';
+  inner+=`<div class="${arrowCls}" id="arr_${sid}"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg></div>`;
+  if(isRoot) inner+=`<span class="root-badge">PR</span>`;
+  else if(isChapter&&color) inner+=`<span class="ch-dot" style="background:${color}"></span>`;
+  else if(color) inner+=`<span class="ch-dot" style="background:${hexA(color,0.5)}"></span>`;
+  else inner+=`<span class="ch-dot" style="background:var(--border)"></span>`;
+
+  const descClass='info-desc'+(isChapter||isRoot?' bold':'');
+  const unitTag=concept.unit?`<span class="tag-unit">${esc(concept.unit)}</span>`:'';
+  inner+=`<div class="info"><div class="info-code">${esc(concept.code)}</div><div class="${descClass}">${esc(concept.desc)||'<em style="color:var(--muted)">Sin descripción</em>'}</div>${unitTag?`<div class="info-meta">${unitTag}</div>`:''}</div>`;
+
+  let costHtml='';
+  if(price>0||chMeta) {
+    const priceStr=price>0?`${fmt(price)} €`:'—';
+    if(chMeta&&chMeta.pct>0) costHtml=`<div class="cost-col"><span class="cost-price">${priceStr}</span><span class="cost-pct" style="color:${color}">${fmt(chMeta.pct,1)}%</span><div class="pct-bar-wrap"><div class="pct-bar" style="width:${Math.min(chMeta.pct,100)}%;background:${color}"></div></div></div>`;
+    else if(price>0) costHtml=`<div class="cost-col"><span class="cost-price">${fmt(price)} €</span></div>`;
+  }
+
+  let html=`<div class="node" id="${sid}"><div class="${rowCls}" ${clickAttr} data-code="${esc(code)}"><div class="ch-strip" style="${stripStyle}"></div><div style="width:${indentPx}px;flex-shrink:0"></div>${inner}${costHtml}${diffStrip}</div><div class="${childrenCls}" id="ch_${sid}">`;
+  for(const child of children) html+=buildNode(child.code,depth+1,code,chCode,bc3,meta,sfx);
+  html+=`</div></div>`;
+  return html;
+}
+
+// NODE CLICK
+function nodeClick(e,code,parentCode,sfx) {
+  const sid='n'+sfx+'_'+code.replace(/[^a-zA-Z0-9]/g,'_');
+  const ch=document.getElementById('ch_'+sid), arr=document.getElementById('arr_'+sid);
+  if(ch) { ch.classList.toggle('open'); if(arr) arr.classList.toggle('open'); }
+  const scope=sfx==='S'?document.getElementById('singleLayout'):sfx==='A'?document.getElementById('treeA'):document.getElementById('treeB');
+  (scope||document).querySelectorAll('.row.active').forEach(r=>r.classList.remove('active'));
+  e.currentTarget.classList.add('active');
+  if(sfx==='S') showDetailSingle(code,parentCode);
+  else showCmpDetail(code,parentCode,sfx);
+}
+
+// EXPAND/COLLAPSE
+function expandAllActive() { if(cmpMode) { expandCol('A'); expandCol('B'); } else expandCol('S'); }
+function collapseAllActive() { if(cmpMode) { collapseCol('A'); collapseCol('B'); } else collapseCol('S'); }
+function expandCol(sfx) {
+  const el=document.getElementById(sfx==='S'?'treeS':sfx==='A'?'treeA':'treeB'); if(!el) return;
+  el.querySelectorAll('.children').forEach(c=>c.classList.add('open'));
+  el.querySelectorAll('.arrow:not(.leaf)').forEach(a=>a.classList.add('open'));
+}
+function collapseCol(sfx) {
+  const el=document.getElementById(sfx==='S'?'treeS':sfx==='A'?'treeA':'treeB'); if(!el) return;
+  const bc3=sfx==='S'?BC3:sfx==='A'?BC3A:BC3B;
+  el.querySelectorAll('.children').forEach(c=>c.classList.remove('open'));
+  el.querySelectorAll('.arrow').forEach(a=>a.classList.remove('open'));
+  if(bc3?.rootCode) {
+    const rs='n'+sfx+'_'+bc3.rootCode.replace(/[^a-zA-Z0-9]/g,'_');
+    const rc=document.getElementById('ch_'+rs), ra=document.getElementById('arr_'+rs);
+    if(rc) rc.classList.add('open'); if(ra) ra.classList.add('open');
+  }
+}
+
+// SEARCH
+function onSearchSingle(q) { onSearchIn(q,'S',BC3); }
+function onSearchCol(q,sfx) { onSearchIn(q,sfx,sfx==='A'?BC3A:BC3B); }
+function onSearchIn(q,sfx,bc3) {
+  q=q.trim().toLowerCase();
+  const treeId=sfx==='S'?'treeS':sfx==='A'?'treeA':'treeB';
+  const treeEl=document.getElementById(treeId); if(!bc3) return;
+  if(!q) {
+    treeEl.querySelectorAll('.node').forEach(n=>n.style.display='');
+    treeEl.querySelectorAll('.info-desc').forEach(d=>{if(d.dataset.orig)d.innerHTML=esc(d.dataset.orig);});
+    treeEl.querySelectorAll('.children').forEach(c=>c.classList.remove('open'));
+    treeEl.querySelectorAll('.arrow').forEach(a=>a.classList.remove('open'));
+    const re=treeEl.querySelector('.children');
+    if(re) { re.classList.add('open'); const ar=treeEl.querySelector('.arrow'); if(ar) ar.classList.add('open'); }
+    return;
+  }
+  treeEl.querySelectorAll('.info-desc').forEach(d=>{if(!d.dataset.orig)d.dataset.orig=d.textContent;});
+  treeEl.querySelectorAll('.node').forEach(n=>n.style.display='none');
+  treeEl.querySelectorAll('.children').forEach(c=>c.classList.remove('open'));
+  const re=new RegExp('('+q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','gi');
+  Object.values(bc3.concepts).forEach(c=>{
+    if(!c.code.toLowerCase().includes(q)&&!c.desc.toLowerCase().includes(q)) return;
+    const sid='n'+sfx+'_'+c.code.replace(/[^a-zA-Z0-9]/g,'_');
+    const nodeEl=document.getElementById(sid); if(!nodeEl) return;
+    nodeEl.style.display='';
+    const descEl=nodeEl.querySelector('.info-desc');
+    if(descEl) descEl.innerHTML=esc(c.desc).replace(re,'<mark>$1</mark>');
+    let p=nodeEl.parentElement;
+    while(p&&p.id!==treeId) {
+      if(p.classList.contains('node')) p.style.display='';
+      if(p.classList.contains('children')) { p.classList.add('open'); const a=document.getElementById('arr_'+p.id.replace(/^ch_/,'')); if(a) a.classList.add('open'); }
+      p=p.parentElement;
+    }
+  });
+}
+
+// OVERVIEW
+function renderOverview() {
+  if(!BC3||!BC3.rootCode) return;
+  const {concepts,structure,rootCode,_filename,projectDesc,versionInfo}=BC3;
+  const root=concepts[rootCode], chapters=structure[rootCode]||[], totalPrice=root?.price||0;
+  let h='';
+  h+=`<div><div class="overview-title">${esc(projectDesc||_filename)}</div><div class="overview-sub">${versionInfo.program?esc(versionInfo.program)+' · ':''} ${versionInfo.version?esc(versionInfo.version)+' · ':''} ${Object.keys(concepts).length} conceptos</div></div>`;
+  if(totalPrice>0) h+=`<div style="background:var(--green-bg);border:1px solid #bbf7d0;border-radius:10px;padding:14px 18px;display:flex;justify-content:space-between;align-items:center"><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--green)">Presupuesto total</div><div style="font-size:22px;font-weight:800;color:var(--green)">${fmt(totalPrice)} €</div></div>`;
+  if(chapters.length>0&&totalPrice>0) {
+    h+=`<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px">Distribución por capítulos</div><div class="stack-bar">`;
+    for(const ch of chapters) { const m=metaS[ch.code], c=concepts[ch.code]; if(!m||!c) continue; h+=`<div class="stack-seg" style="width:${m.pct.toFixed(2)}%;background:${m.color}" title="${esc(c.desc)} — ${fmt(m.price)} € (${fmt(m.pct,1)}%)" onclick="scrollToChapterS('${esc(ch.code)}')"></div>`; }
+    h+=`</div></div>`;
+  }
+  if(chapters.length>0) {
+    h+=`<div><table class="ch-table"><thead><tr><th style="width:20px"></th><th>Capítulo</th><th style="text-align:right">Importe</th><th style="text-align:right">%</th><th class="ch-bar-cell"></th></tr></thead><tbody>`;
+    for(const ch of chapters) { const m=metaS[ch.code], c=concepts[ch.code]; if(!c||!m) continue; h+=`<tr style="cursor:pointer" onclick="scrollToChapterS('${esc(ch.code)}')"><td><span class="ch-color-pill" style="background:${m.color}"></span></td><td><div style="font-weight:600;font-size:12px">${esc(c.desc||c.code)}</div><div style="font-size:10px;color:var(--muted);font-family:monospace">${esc(c.code)}</div></td><td style="text-align:right;font-weight:700;font-size:12px;white-space:nowrap">${fmt(m.price)} €</td><td style="text-align:right;font-weight:700;font-size:12px;color:${m.color}">${fmt(m.pct,1)}%</td><td class="ch-bar-cell"><div class="ch-bar-bg"><div class="ch-bar-fill" style="width:${Math.min(m.pct,100)}%;background:${m.color}"></div></div></td></tr>`; }
+    h+=`</tbody></table></div>`;
+  }
+  document.getElementById('emptyState').innerHTML=h;
+}
+
+function scrollToChapterS(code) {
+  const sid='nS_'+code.replace(/[^a-zA-Z0-9]/g,'_');
+  const el=document.getElementById(sid); if(!el) return;
+  const ch=document.getElementById('ch_'+sid), arr=document.getElementById('arr_'+sid);
+  if(ch&&!ch.classList.contains('open')) { ch.classList.add('open'); if(arr) arr.classList.add('open'); }
+  el.scrollIntoView({behavior:'smooth',block:'start'});
+  document.querySelectorAll('.row.active').forEach(r=>r.classList.remove('active'));
+  const row=el.querySelector('.row'); if(row) row.classList.add('active');
+  showDetailSingle(code,'');
+}
+
+// COMPARE OVERVIEW
+function refreshCmpOverview() {
+  if(!BC3A&&!BC3B) { showCmpEmpty(); return; }
+  const aTotal=BC3A?(BC3A.concepts[BC3A.rootCode]?.price||0):null, bTotal=BC3B?(BC3B.concepts[BC3B.rootCode]?.price||0):null;
+  document.getElementById('cmpEmpty').style.display='none';
+  const content=document.getElementById('cmpContent'); content.style.display='flex';
+  document.getElementById('cmpTitle').textContent='Resumen comparativo';
+  let h='';
+  if(aTotal!==null||bTotal!==null) {
+    let diffHtml='';
+    if(aTotal!==null&&bTotal!==null) {
+      const diff=bTotal-aTotal, diffPct=aTotal>0?(diff/aTotal*100):0, cls=diff<-0.005?'cheaper':diff>0.005?'dearer':'equal', sign=diff>0?'+':'';
+      diffHtml=`<div class="pcc-row diff"><div><div class="dl-label" style="margin-bottom:5px">Diferencia (B − A)</div><span class="diff-badge ${cls}">${sign}${fmt(diff)} € (${sign}${fmt(diffPct,1)}%)</span></div><span class="diff-val ${cls}" style="font-size:20px">${diff>0?'▲':diff<0?'▼':'='}</span></div>`;
+    }
+    h+=`<div class="pcc">${aTotal!==null?`<div class="pcc-row a"><div><div class="pcc-lbl a">Presupuesto A</div><div style="font-size:10.5px;color:var(--muted);margin-top:1px">${esc(BC3A._filename)}</div></div><div class="pcc-val a">${fmt(aTotal)} €</div></div>`:''}${bTotal!==null?`<div class="pcc-row b"><div><div class="pcc-lbl b">Presupuesto B</div><div style="font-size:10.5px;color:var(--muted);margin-top:1px">${esc(BC3B._filename)}</div></div><div class="pcc-val b">${fmt(bTotal)} €</div></div>`:''}${diffHtml}</div>`;
+  }
+  if(aTotal&&bTotal) {
+    const sum=aTotal+bTotal, wA=(aTotal/sum*100).toFixed(1), wB=(bTotal/sum*100).toFixed(1);
+    h+=`<div class="diff-bar-wrap"><div class="diff-bar-lbl">Peso relativo</div><div class="diff-bar-track"><div class="diff-bar-a" style="width:${wA}%"></div><div class="diff-bar-b" style="width:${wB}%"></div></div><div class="diff-bar-labels"><span style="color:var(--col-a);font-weight:700">A ${wA}%</span><span style="color:var(--col-b);font-weight:700">B ${wB}%</span></div></div>`;
+  }
+  if(BC3A&&BC3B) {
+    const chapA=BC3A.structure[BC3A.rootCode]||[], chapB=BC3B.structure[BC3B.rootCode]||[];
+    const usedB=new Set(); const rows=[];
+    for(const chA of chapA) {
+      const cA=BC3A.concepts[chA.code]; if(!cA) continue;
+      let mB=chapB.find(c=>{const cB=BC3B.concepts[c.code]; return cB&&(cB.desc.trim().toLowerCase()===cA.desc.trim().toLowerCase()||c.code===chA.code);});
+      const cB=mB?BC3B.concepts[mB.code]:null, pA=cA.price||0, pB=cB?(cB.price||0):null;
+      if(mB) usedB.add(mB.code);
+      const diff=pB!==null?(pB-pA):null, cls=diff===null?'var(--muted)':diff<-0.005?'var(--green)':diff>0.005?'#dc2626':'var(--muted)', sign=diff!==null&&diff>0?'+':'';
+      rows.push(`<tr><td style="font-size:11px;font-weight:600;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(cA.desc)}">${esc(cA.desc||cA.code)}</td><td style="text-align:right;font-size:11px;font-weight:700;color:var(--col-a);white-space:nowrap">${fmt(pA)} €</td><td style="text-align:right;font-size:11px;font-weight:700;color:var(--col-b);white-space:nowrap">${pB!==null?fmt(pB)+' €':'—'}</td><td style="text-align:right;font-size:11px;font-weight:700;white-space:nowrap;color:${cls}">${diff!==null?(sign+fmt(diff)+' €'):'—'}</td></tr>`);
+    }
+    for(const chB of chapB) { if(usedB.has(chB.code)) continue; const cB=BC3B.concepts[chB.code]; if(!cB) continue; rows.push(`<tr><td style="font-size:11px;color:var(--muted);max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(cB.desc||cB.code)}</td><td style="text-align:right;font-size:11px;color:var(--muted)">—</td><td style="text-align:right;font-size:11px;font-weight:700;color:var(--col-b)">${fmt(cB.price||0)} €</td><td style="text-align:right;color:var(--muted)">—</td></tr>`); }
+    if(rows.length) h+=`<div class="cmp-box"><div class="cmp-box-title">Comparación por capítulos</div><table class="t"><thead><tr><th>Capítulo</th><th style="text-align:right;color:var(--col-a)">A</th><th style="text-align:right;color:var(--col-b)">B</th><th style="text-align:right">Dif.</th></tr></thead><tbody>${rows.join('')}</tbody></table></div>`;
+  }
+  h+=`<div style="font-size:11px;color:var(--muted);text-align:center;padding:4px 0">Haz clic en una partida para comparar precios detallados</div>`;
+  content.innerHTML=h;
+}
+
+function showCmpEmpty() { document.getElementById('cmpEmpty').style.display='flex'; document.getElementById('cmpContent').style.display='none'; document.getElementById('cmpTitle').textContent='Comparación'; }
+
+function showCmpDetail(code,parentCode,sfx) {
+  const srcBC3=sfx==='A'?BC3A:BC3B, otherBC3=sfx==='A'?BC3B:BC3A;
+  const concept=srcBC3.concepts[code]; if(!concept) return;
+  const otherConcept=otherBC3?otherBC3.concepts[code]:null;
+  const pA=sfx==='A'?(concept.price||0):(otherConcept?otherConcept.price||0:null), pB=sfx==='B'?(concept.price||0):(otherConcept?otherConcept.price||0:null);
+  document.getElementById('cmpEmpty').style.display='none';
+  const content=document.getElementById('cmpContent'); content.style.display='flex';
+  document.getElementById('cmpTitle').textContent=concept.desc||code;
+  let h='';
+  const hasA=pA!==null, hasB=pB!==null;
+  let diffHtml='';
+  if(hasA&&hasB) {
+    const diff=pB-pA, diffPct=pA>0?(diff/pA*100):0, cls=diff<-0.005?'cheaper':diff>0.005?'dearer':'equal', sign=diff>0?'+':'', label=cls==='cheaper'?'B más barato':cls==='dearer'?'B más caro':'Precio igual';
+    diffHtml=`<div class="pcc-row diff"><div><div class="dl-label" style="margin-bottom:5px">Diferencia (B − A)</div><span class="diff-badge ${cls}">${sign}${fmt(diff)} € (${sign}${fmt(diffPct,1)}%)</span></div><span class="diff-badge ${cls}" style="padding:4px 10px;font-size:11px">${label}</span></div>`;
+  }
+  h+=`<div class="pcc">${hasA?`<div class="pcc-row a"><div><div class="pcc-lbl a">Precio A</div></div><div class="pcc-val a">${fmt(pA)} €</div></div>`:'<div class="pcc-row a" style="opacity:.5"><div class="pcc-lbl a">Precio A</div><span style="color:var(--muted);font-size:12px">No disponible</span></div>'}${hasB?`<div class="pcc-row b"><div><div class="pcc-lbl b">Precio B</div></div><div class="pcc-val b">${fmt(pB)} €</div></div>`:'<div class="pcc-row b" style="opacity:.5"><div class="pcc-lbl b">Precio B</div><span style="color:var(--muted);font-size:12px">No disponible</span></div>'}${diffHtml}</div>`;
+  h+=`<div class="dl"><div class="dl-label">Código</div><div class="dl-code">${esc(code)}</div></div>`;
+  if(concept.unit) h+=`<div class="dl"><div class="dl-label">Unidad</div><div class="dl-text">${esc(concept.unit)}</div></div>`;
+  if(concept.desc) h+=`<div class="dl"><div class="dl-label">Descripción</div><div class="dl-text">${esc(concept.desc)}</div></div>`;
+  const medKey=(parentCode||'')+'::'+code, medA=BC3A?BC3A.mediciones[medKey]:null, medB=BC3B?BC3B.mediciones[medKey]:null;
+  if(medA||medB) {
+    h+=`<div class="cmp-box"><div class="cmp-box-title">Medición e importe</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border)"><div style="padding:10px 12px;background:var(--col-a-bg)"><div style="font-size:17px;font-weight:800;color:var(--col-a)">${medA?fmt(medA.total,3):'—'}</div><div style="font-size:10.5px;color:var(--muted)">Med. A</div>${medA&&pA?`<div style="font-size:11px;font-weight:700;color:var(--col-a);margin-top:2px">${fmt(medA.total*pA)} €</div>`:''}</div><div style="padding:10px 12px;background:var(--col-b-bg)"><div style="font-size:17px;font-weight:800;color:var(--col-b)">${medB?fmt(medB.total,3):'—'}</div><div style="font-size:10.5px;color:var(--muted)">Med. B</div>${medB&&pB?`<div style="font-size:11px;font-weight:700;color:var(--col-b);margin-top:2px">${fmt(medB.total*pB)} €</div>`:''}</div></div></div>`;
+  }
+  const chA=BC3A?BC3A.structure[code]||[]:[], chB=BC3B?BC3B.structure[code]||[]:[];
+  if(chA.length>0||chB.length>0) {
+    const allCodes=[...new Set([...chA.map(c=>c.code),...chB.map(c=>c.code)])];
+    const rows=allCodes.map(c=>{
+      const cA=BC3A?.concepts[c], cB=BC3B?.concepts[c], prA=cA?.price||null, prB=cB?.price||null, diff=prA!==null&&prB!==null?(prB-prA):null, col=diff===null?'var(--muted)':diff<-0.005?'var(--green)':diff>0.005?'#dc2626':'var(--muted)', sign=diff!==null&&diff>0?'+':'';
+      return `<tr><td style="font-family:monospace;font-size:10.5px;color:var(--accent)">${esc(c)}</td><td style="font-size:10.5px;color:var(--muted);max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(cA?.desc||cB?.desc||'')}</td><td style="text-align:right;font-size:11px;font-weight:700;color:var(--col-a)">${prA!==null?fmt(prA)+' €':'—'}</td><td style="text-align:right;font-size:11px;font-weight:700;color:var(--col-b)">${prB!==null?fmt(prB)+' €':'—'}</td><td style="text-align:right;font-size:11px;font-weight:700;color:${col}">${diff!==null?(sign+fmt(diff)+' €'):'—'}</td></tr>`;
+    });
+    h+=`<div class="cmp-box"><div class="cmp-box-title">Descomposición comparada</div><table class="t"><thead><tr><th>Cód.</th><th>Desc.</th><th style="text-align:right;color:var(--col-a)">A</th><th style="text-align:right;color:var(--col-b)">B</th><th style="text-align:right">Dif.</th></tr></thead><tbody>${rows.join('')}</tbody></table></div>`;
+  }
+  content.innerHTML=h;
+}
+
+// ── SISTEMA DE EDICIÓN (CRUD) ──
+function editNodeForm(code, parentCode) {
+  const c = BC3.concepts[code];
+  const kids = BC3.structure[code] || [];
+  const isLeaf = kids.length === 0;
+
+  let h = `<div style="display:flex;gap:6px;margin-bottom:12px;border-bottom:1px solid var(--border);padding-bottom:12px">
+    <button class="btn btn-success" onclick="saveNode('${esc(code)}', '${esc(parentCode)}')">💾 Guardar Cambios</button>
+    <button class="btn" onclick="showDetailSingle('${esc(code)}', '${esc(parentCode)}')">✕ Cancelar</button>
+  </div>`;
+
+  let typeSelect = `<select id="en_type" class="form-input">`;
+  for (const [k, v] of Object.entries(TYPE_LABELS)) {
+      typeSelect += `<option value="${k}" ${c.typeStr === k ? 'selected' : ''}>${v}</option>`;
+  }
+  typeSelect += `</select>`;
+
+  h += `<div class="dl"><div class="dl-label">Descripción</div><textarea id="en_desc" class="form-input" style="height:80px;resize:vertical">${esc(c.desc)}</textarea></div>`;
+  h += `<div class="dl"><div class="dl-label">Texto descriptivo extenso</div><textarea id="en_text" class="form-input" style="height:100px;resize:vertical" placeholder="Añadir un texto descriptivo detallado...">${esc(c.text||'')}</textarea></div>`;
+  
+  h += `<div class="form-grid">
+          <div class="dl"><div class="dl-label">Unidad</div><input id="en_unit" class="form-input" value="${esc(c.unit)}"></div>
+          <div class="dl"><div class="dl-label">Clasificación</div>${typeSelect}</div>
+        </div>`;
+  
+  h += `<div class="form-grid">
+          ${isLeaf ? `<div class="dl"><div class="dl-label">Precio Unitario (€)</div><input id="en_price" type="number" step="0.01" class="form-input" value="${c.price}"></div>` : `<div class="dl"><div class="dl-label">Precio Unitario (€)</div><div class="form-input" style="background:var(--surface2);color:var(--muted)">Autocalculado por suma de hijos</div></div>`}
+        </div>`;
+
+  if(parentCode && code !== BC3.rootCode) {
+    const pArr = BC3.structure[parentCode];
+    const ch = pArr.find(x => x.code === code);
+    const mTot = ch ? ch.rend : 1;
+    h += `<div class="dl" style="margin-top:12px; border:2px dashed var(--accent); padding:10px; border-radius:6px; background:var(--accent-bg)">
+            <div class="dl-label" style="color:var(--accent)">Medición / Cantidad (dentro de su padre)</div>
+            <input id="en_med" type="number" step="0.001" class="form-input" style="font-weight:700; font-size:14px" value="${mTot}">
+            <div style="font-size:10.5px;color:var(--muted);margin-top:4px">Aquí puedes inyectar datos geométricos extraídos del modelo BIM.</div>
+          </div>`;
+  }
+
+  document.getElementById('detailBody').innerHTML = h;
+}
+
+function saveNode(code, parentCode) {
+  const c = BC3.concepts[code];
+  c.desc = document.getElementById('en_desc').value;
+  c.unit = document.getElementById('en_unit').value;
+  
+  const textEl = document.getElementById('en_text');
+  if(textEl) c.text = textEl.value;
+
+  const typeEl = document.getElementById('en_type');
+  if(typeEl) c.typeStr = typeEl.value;
+  
+  const priceEl = document.getElementById('en_price');
+  if(priceEl) c.price = pf(priceEl.value);
+
+  const medEl = document.getElementById('en_med');
+  if(medEl && parentCode) {
+    const mVal = pf(medEl.value);
+    const medKey = parentCode+'::'+code;
+    BC3.mediciones[medKey] = { total: mVal, lines: [{tipo:'', comment:'Medición consolidada manual/BIM', n:mVal, l:'', a:'', h:''}] };
+  }
+
+  recalcBC3(BC3);
+  computeMeta(BC3, metaS);
+  renderSingle();
+  showDetailSingle(code, parentCode);
+}
+
+function deleteNode(code, parentCode) {
+  if(!confirm('¿Estás seguro de que deseas eliminar esta partida? Esta acción recalculará todo el presupuesto.')) return;
+  if(BC3.structure[parentCode]) {
+    BC3.structure[parentCode] = BC3.structure[parentCode].filter(c => c.code !== code);
+  }
+  recalcBC3(BC3);
+  computeMeta(BC3, metaS);
+  renderSingle();
+  backToOverview();
+}
+
+function addNodeForm(parentCode) {
+  let h = `<div style="display:flex;gap:6px;margin-bottom:12px;border-bottom:1px solid var(--border);padding-bottom:12px">
+    <button class="btn btn-success" onclick="saveNewNode('${esc(parentCode)}')">💾 Crear y Añadir</button>
+    <button class="btn" onclick="showDetailSingle('${esc(parentCode)}', '')">✕ Cancelar</button>
+  </div>`;
+
+  let typeSelect = `<select id="an_type" class="form-input">`;
+  for (const [k, v] of Object.entries(TYPE_LABELS)) {
+      typeSelect += `<option value="${k}">${v}</option>`;
+  }
+  typeSelect += `</select>`;
+
+  h += `<div style="font-size:14px;font-weight:700;margin-bottom:12px">Añadir Sub-elemento al código: ${esc(parentCode)}</div>`;
+  h += `<div class="form-grid">
+          <div class="dl"><div class="dl-label">Código (Ej: P01.05)</div><input id="an_code" class="form-input" placeholder="Escribe un código único"></div>
+        </div>`;
+  h += `<div class="dl"><div class="dl-label">Descripción</div><textarea id="an_desc" class="form-input" style="height:60px;resize:vertical"></textarea></div>`;
+  h += `<div class="dl"><div class="dl-label">Texto descriptivo extenso</div><textarea id="an_text" class="form-input" style="height:80px;resize:vertical"></textarea></div>`;
+  h += `<div class="form-grid">
+          <div class="dl"><div class="dl-label">Unidad (m2, ud...)</div><input id="an_unit" class="form-input" placeholder="Ej: ud"></div>
+          <div class="dl"><div class="dl-label">Clasificación</div>${typeSelect}</div>
+        </div>`;
+  h += `<div class="dl"><div class="dl-label">Precio Unitario (€)</div><input id="an_price" type="number" step="0.01" class="form-input" value="0"></div>`;
+  
+  h += `<div class="dl" style="margin-top:12px; border:2px dashed var(--accent); padding:10px; border-radius:6px; background:var(--accent-bg)">
+          <div class="dl-label" style="color:var(--accent)">Medición / Cantidad</div>
+          <input id="an_rend" type="number" step="0.001" class="form-input" style="font-weight:700; font-size:14px" value="1">
+          <div style="font-size:10.5px;color:var(--muted);margin-top:4px">Aquí puedes inyectar datos geométricos extraídos del modelo BIM.</div>
+        </div>`;
+
+  document.getElementById('detailBody').innerHTML = h;
+}
+
+function saveNewNode(parentCode) {
+  let code = document.getElementById('an_code').value.trim();
+  if(!code) { alert('Es obligatorio asignar un código a la partida.'); return; }
+
+  if(!BC3.concepts[code]) {
+    BC3.concepts[code] = {
+      code: code,
+      desc: document.getElementById('an_desc').value,
+      unit: document.getElementById('an_unit').value,
+      price: pf(document.getElementById('an_price').value),
+      typeStr: document.getElementById('an_type') ? document.getElementById('an_type').value : '0',
+      text: document.getElementById('an_text') ? document.getElementById('an_text').value : '',
+      synonyms: []
+    };
+  }
+
+  if(!BC3.structure[parentCode]) BC3.structure[parentCode] = [];
+  const rend = pf(document.getElementById('an_rend').value) || 1;
+
+  if(!BC3.structure[parentCode].find(x => x.code === code)) {
+    BC3.structure[parentCode].push({code: code, factor: 1, rend: rend});
+    const medKey = parentCode + '::' + code;
+    BC3.mediciones[medKey] = { total: rend, lines: [{tipo:'', comment:'Medición inicial', n:rend, l:'', a:'', h:''}] };
+  }
+
+  recalcBC3(BC3);
+  computeMeta(BC3, metaS);
+  renderSingle();
+  
+  const sid = 'nS_' + parentCode.replace(/[^a-zA-Z0-9]/g,'_');
+  const ch = document.getElementById('ch_'+sid);
+  const arr = document.getElementById('arr_'+sid);
+  if(ch) ch.classList.add('open');
+  if(arr) arr.classList.add('open');
+
+  showDetailSingle(code, parentCode);
+}
+
+function showDetailSingle(code,parentCode) {
+  if(!BC3) return;
+  const {concepts,structure,mediciones,techInfo,coeff}=BC3;
+  const concept=concepts[code]; if(!concept) return;
+  document.getElementById('emptyState').style.display='none';
+  const body=document.getElementById('detailBody'); body.style.display='flex';
+  const isChap=!!(metaS[code]), color=metaS[code]?.color||(code===BC3.rootCode?'#1a1d23':null);
+  document.getElementById('detailTitle').textContent=concept.desc||concept.code;
+  const children=structure[code]||[], medKey=(parentCode||'')+'::'+code, med=mediciones[medKey], tech=techInfo[code]||{};
+  
+  let h='';
+  h+=`<div style="display:flex;gap:6px;margin-bottom:12px;border-bottom:1px solid var(--border);padding-bottom:12px">
+        <button class="btn" onclick="editNodeForm('${esc(code)}', '${esc(parentCode)}')">✏️ Editar Datos</button>
+        <button class="btn" onclick="addNodeForm('${esc(code)}')">➕ Añadir Sub-elemento</button>
+        ${code !== BC3.rootCode ? `<button class="btn btn-danger" onclick="deleteNode('${esc(code)}', '${esc(parentCode)}')">🗑️ Borrar Partida</button>` : ''}
+      </div>`;
+
+  h+=`<div class="dl"><div class="dl-label">Código</div><div class="dl-code">${esc(concept.code)}</div></div>`;
+  if(concept.synonyms?.length) h+=`<div class="dl"><div class="dl-label">Sinónimos</div><div class="dl-text">${concept.synonyms.map(esc).join(', ')}</div></div>`;
+  const typeLabel=TYPE_LABELS[concept.typeStr]||concept.typeStr;
+  h+=`<div class="dl"><div class="dl-label">Clasificación</div><div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:12px"><span style="background:var(--accent-bg);color:var(--accent);padding:2px 8px;border-radius:10px;font-weight:600">${esc(typeLabel)}</span>${concept.date?`<span style="color:var(--muted)">📅 ${esc(concept.date)}</span>`:''}</div></div>`;
+  if(concept.desc) h+=`<div class="dl"><div class="dl-label">Resumen</div><div class="dl-text">${esc(concept.desc)}</div></div>`;
+  if(concept.text) h+=`<div class="dl"><div class="dl-label">Texto descriptivo</div><div class="dl-text" style="white-space:pre-wrap">${esc(concept.text)}</div></div>`;
+  
+  if(concept.price>0||concept.unit) {
+    const bgColor=color?hexA(color,.1):'var(--green-bg)', bdColor=color?hexA(color,.3):'#bbf7d0', txtColor=color||'var(--green)';
+    h+=`<div class="price-card" style="background:${bgColor};border:1px solid ${bdColor}"><div><div class="pval" style="color:${txtColor}">${fmt(concept.price)} €</div>${isChap&&metaS[code]?`<div style="font-size:11px;color:${txtColor};font-weight:600;margin-top:2px">${fmt(metaS[code].pct,1)}% del presupuesto total</div>`:''}</div><div class="punit">${esc(concept.unit)||'—'}</div></div>`;
+    if(isChap&&metaS[code]) { const pct=metaS[code].pct; h+=`<div class="dl"><div class="dl-label">Peso sobre el total</div><div style="display:flex;align-items:center;gap:10px"><div style="flex:1;height:10px;background:#e5e7eb;border-radius:5px;overflow:hidden"><div style="height:100%;width:${Math.min(pct,100)}%;background:${color};border-radius:5px;transition:width .4s"></div></div><span style="font-size:13px;font-weight:700;color:${color};min-width:45px;text-align:right">${fmt(pct,2)}%</span></div></div>`; }
+  }
+  if(code===BC3.rootCode&&children.length>0) {
+    h+=`<div class="dl"><div class="dl-label">Análisis por capítulos</div><table class="t green"><thead><tr><th></th><th>Capítulo</th><th style="text-align:right">Importe</th><th style="text-align:right">%</th></tr></thead><tbody>`;
+    for(const ch of children) { const cc=concepts[ch.code], m=metaS[ch.code]; if(!cc||!m) continue; h+=`<tr><td><span class="ch-color-pill" style="background:${m.color}"></span></td><td style="font-weight:600">${esc(cc.desc||cc.code)}</td><td style="text-align:right;font-weight:700;white-space:nowrap">${fmt(cc.price)} €</td><td style="text-align:right;font-weight:700;color:${m.color}">${fmt(m.pct,1)}%</td></tr>`; }
+    h+=`</tbody></table></div>`;
+  }
+  if(children.length>0) {
+    const chColor=color||'var(--green)';
+    h+=`<div class="dl"><div class="dl-label">Descomposición — ${children.length} elemento(s)</div><table class="t" style="--th-bg:${color?hexA(color,.08):'var(--green-bg)'}"><thead style="background:${color?hexA(color,.08):'var(--green-bg)'}"><tr><th style="color:${chColor}">Código</th><th style="color:${chColor}">Descripción</th><th style="color:${chColor}">Ud</th><th style="text-align:right;color:${chColor}">Cantidad</th><th style="text-align:right;color:${chColor}">Parcial</th></tr></thead><tbody>`;
+    let total=0;
+    for(const ch of children) { 
+      const cc=concepts[ch.code]; 
+      const parcial=(cc&&cc.price>0)?cc.price*ch.rend:null; 
+      if(parcial!==null) total+=parcial; 
+      h+=`<tr><td style="font-family:monospace;font-size:10.5px;color:var(--accent)">${esc(ch.code)}</td><td style="color:var(--muted)">${cc?esc(cc.desc):esc(ch.code)}</td><td style="color:var(--amber)">${cc?esc(cc.unit||''):''}</td><td style="text-align:right;font-weight:600">${fmt(ch.rend,5)}</td><td style="text-align:right">${parcial!==null?fmt(parcial)+' €':'—'}</td></tr>`; 
+    }
+    h+=`</tbody></table>`;
+    if(total>0) h+=`<div class="total-row" style="background:${color?hexA(color,.1):'var(--accent-bg)'};color:${color||'var(--accent)'}"><span>Suma Total M/Descomp.</span><span>${fmt(total)} €</span></div>`;
+    h+=`</div>`;
+  }
+  if(med) {
+    h+=`<div class="dl"><div class="dl-label">Mediciones</div>`;
+    if(med.lines.length>0) { h+=`<table class="t"><thead><tr><th>Comentario</th><th>N</th><th>L/A1</th><th>A/A2</th><th>H/A3</th></tr></thead><tbody>`; for(const ml of med.lines) { if(!ml.comment&&!ml.n&&!ml.l&&!ml.a&&!ml.h) continue; h+=`<tr><td>${esc(ml.comment)}</td><td style="text-align:right">${esc(ml.n)}</td><td style="text-align:right">${esc(ml.l)}</td><td style="text-align:right">${esc(ml.a)}</td><td style="text-align:right">${esc(ml.h)}</td></tr>`; } h+=`</tbody></table>`; }
+    h+=`<div class="total-row"><span>Total medición en el Padre</span><span>${fmt(med.total,4)}</span></div>`;
+    h+=`</div>`;
+  }
+  body.innerHTML=h;
+}
+
+function backToOverview() { document.getElementById('detailBody').style.display='none'; document.getElementById('emptyState').style.display='flex'; document.getElementById('detailTitle').textContent='Resumen del proyecto'; document.querySelectorAll('.row.active').forEach(r=>r.classList.remove('active')); }
+
+// EXPORTACIONES 
+function exportCSV() {
+  if(!BC3) { alert('Carga primero un archivo BC3.'); return; }
+  const {concepts,structure,rootCode}=BC3;
+  const totalPrice=concepts[rootCode]?.price||0;
+  const rows=[['Tipo','Código','Descripción','Unidad','Precio Unit. (€)','Cantidad','Importe (€)','% s/total']];
+  function walk(code,depth,parentCode) {
+    const c=concepts[code]; if(!c) return;
+    const kids=structure[code]||[];
+    const type=kids.length>0?(depth===0?'Proyecto':depth===1?'Capítulo':'Subcapítulo'):'Partida';
+    let qty = ''; let importe = c.price || 0;
+    if(parentCode && structure[parentCode]) {
+      const chNode = structure[parentCode].find(x => x.code === code);
+      if(chNode) qty = chNode.rend;
+      importe = (qty !== '' ? qty : 1) * (c.price || 0);
+    }
+    const pct=totalPrice>0 ? ((importe/totalPrice)*100).toFixed(2) : '';
+    rows.push([type, '  '.repeat(depth)+c.code, c.desc, c.unit||'', c.price ? String(c.price).replace('.',',') : '0', qty !== '' ? String(qty).replace('.',',') : '', String(importe).replace('.',','), pct]);
+    for(const ch of kids) walk(ch.code,depth+1,code);
+  }
+  if(rootCode) walk(rootCode,0,'');
+  const csv=rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(';')).join('\n');
+  const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'}), url=URL.createObjectURL(blob), a=document.createElement('a');
+  a.href=url; a.download='presupuesto_bc3.csv'; a.click(); URL.revokeObjectURL(url);
+}
+
+function exportExcel() {
+  if(!BC3) { alert('Carga primero un archivo BC3 para exportar.'); return; }
+  const {concepts,structure,rootCode}=BC3;
+  const totalPrice=concepts[rootCode]?.price||0;
+  let h=`<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"><style>th{background-color:#f0f2f5;font-weight:bold;text-align:left;border:1px solid #ccc;padding:5px;}td{border:1px solid #ccc;padding:5px;vertical-align:top;}.num{text-align:right;}</style></head><body><table><thead><tr><th>Tipo</th><th>Código</th><th>Descripción</th><th>Unidad</th><th class="num">Precio Unit. (€)</th><th class="num">Cantidad</th><th class="num">Importe (€)</th><th class="num">% s/total</th></tr></thead><tbody>`;
+  function walk(code,depth,parentCode) {
+    const c=concepts[code]; if(!c) return;
+    const kids=structure[code]||[];
+    const type=kids.length>0?(depth===0?'Proyecto':depth===1?'Capítulo':'Subcapítulo'):'Partida';
+    let qty = ''; let importe = c.price || 0;
+    if(parentCode && structure[parentCode]) {
+      const chNode = structure[parentCode].find(x => x.code === code);
+      if(chNode) qty = chNode.rend;
+      importe = (qty !== '' ? qty : 1) * (c.price || 0);
+    }
+    const num = (n) => n !== null && n !== undefined && n !== '' ? String(n).replace('.', ',') : '';
+    const pct=totalPrice>0 ? ((importe/totalPrice)*100).toFixed(2) : '';
+    h+=`<tr><td>${type}</td><td style="mso-number-format:'\\@'">${'&nbsp;&nbsp;'.repeat(depth)}${c.code}</td><td>${esc(c.desc)}</td><td>${esc(c.unit||'')}</td><td class="num">${num(c.price)}</td><td class="num">${num(qty)}</td><td class="num">${num(importe)}</td><td class="num">${num(pct)}</td></tr>`;
+    for(const ch of kids) walk(ch.code,depth+1,code);
+  }
+  if(rootCode) walk(rootCode,0,'');
+  h+=`</tbody></table></body></html>`;
+  const blob=new Blob(['\ufeff'+h],{type:'application/vnd.ms-excel;charset=utf-8;'}), url=URL.createObjectURL(blob), a=document.createElement('a');
+  a.href=url; a.download='presupuesto_bc3.xls'; a.click(); URL.revokeObjectURL(url);
+}
+
+function exportWord() {
+  if(!BC3) { alert('Carga primero un archivo BC3 para exportar.'); return; }
+  const {concepts,structure,mediciones,rootCode}=BC3;
+  let h=`<html xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"><style>body{font-family:'Segoe UI',Arial,sans-serif;font-size:10pt;color:#000;}h1{font-size:16pt;color:#1a1d23;text-transform:uppercase;border-bottom:2px solid #1a1d23;padding-bottom:5px;}h2{font-size:13pt;color:#2563eb;margin-top:24px;border-bottom:1px solid #bfdbfe;padding-bottom:4px;}h3{font-size:11pt;color:#16a34a;margin-top:16px;}.partida{margin-bottom:18px;}.codigo{font-weight:bold;color:#2563eb;}.desc{font-weight:bold;}.text{font-size:9pt;color:#4b5563;margin:4px 0 8px 0;}.datos{font-size:10pt;margin-bottom:6px;}table{border-collapse:collapse;width:100%;margin-top:6px;font-size:9pt;}th,td{border:1px solid #d1d5db;padding:4px 6px;}th{background-color:#f3f4f6;text-align:left;font-weight:bold;}.right{text-align:right;}</style></head><body>`;
+  function walk(code,depth,parentCode) {
+    const c=concepts[code]; if(!c) return;
+    const kids=structure[code]||[], medKey=(parentCode||'')+'::'+code, med=mediciones[medKey];
+    let qty = '';
+    if(parentCode && structure[parentCode]) {
+        const chNode = structure[parentCode].find(x => x.code === code);
+        if(chNode) qty = chNode.rend;
+    }
+    if(depth===0) h+=`<h1>Presupuesto: ${esc(c.desc||c.code)}</h1>`;
+    else if(depth===1) h+=`<h2>Capítulo ${esc(c.code)} - ${esc(c.desc)}</h2>`;
+    else if(kids.length>0) h+=`<h3 style="margin-left:${(depth-1)*20}px">Subcapítulo ${esc(c.code)} - ${esc(c.desc)}</h3>`;
+    else {
+      h+=`<div class="partida" style="margin-left:${(depth-1)*20}px"><div class="datos"><span class="codigo">${esc(c.code)}</span> | <span class="desc">${esc(c.desc)}</span></div>`;
+      if(c.price>0||c.unit) h+=`<div class="datos" style="color: #111827;">${c.price>0?`Precio Unitario: <strong>${fmt(c.price)} €</strong>`:''} ${c.unit?` / ${esc(c.unit)}`:''}</div>`;
+      if(c.text) h+=`<div class="text">${esc(c.text).replace(/\n/g,'<br>')}</div>`;
+      if(med&&med.lines&&med.lines.length>0) {
+        h+=`<table><thead><tr><th>Comentario</th><th class="right">N</th><th class="right">L</th><th class="right">A</th><th class="right">H</th></tr></thead><tbody>`;
+        for(const ml of med.lines) {
+          if(!ml.comment&&!ml.n&&!ml.l&&!ml.a&&!ml.h) continue;
+          h+=`<tr><td>${esc(ml.comment)}</td><td class="right">${esc(ml.n)}</td><td class="right">${esc(ml.l)}</td><td class="right">${esc(ml.a)}</td><td class="right">${esc(ml.h)}</td></tr>`;
+        }
+        h+=`<tr><td colspan="4" class="right"><strong>Total medición:</strong></td><td class="right" style="color: #16a34a;"><strong>${fmt(med.total,4)}</strong></td></tr></tbody></table>`;
+      } else if (qty !== '') {
+        h+=`<div style="font-size:9pt; margin-top:4px;"><strong>Cantidad en el padre:</strong> ${fmt(qty,3)}</div>`;
+      }
+      h+=`</div>`;
+    }
+    for(const ch of kids) walk(ch.code,depth+1,code);
+  }
+  if(rootCode) walk(rootCode,0,'');
+  h+=`</body></html>`;
+  const blob=new Blob(['\ufeff'+h],{type:'application/msword;charset=utf-8;'}), url=URL.createObjectURL(blob), a=document.createElement('a');
+  a.href=url; a.download='presupuesto_bc3.doc'; a.click(); URL.revokeObjectURL(url);
+}
+
+// ── MOTOR BIM / IFC (MÓDULO LAZY LOADED) ──
+let ifcViewer = null;
+let isIfcMode = false;
+let IfcViewerAPI_Class = null;
+
+function toggleIfcMode() {
+  if (cmpMode) { alert('El módulo BIM está diseñado para trabajar con el presupuesto en modo de visualización o edición simple. Desactiva el comparador primero.'); return; }
+  
+  isIfcMode = !isIfcMode;
+  const pane = document.getElementById('ifcPane');
+  if (isIfcMode) {
+      pane.classList.add('show');
+      if (!ifcViewer) initIfcViewer();
+  } else {
+      pane.classList.remove('show');
+  }
+}
+
+async function initIfcViewer() {
+  const loadingOverlay = document.getElementById('ifcLoading');
+  loadingOverlay.style.display = 'flex';
+  
+  try {
+      if (!IfcViewerAPI_Class) {
+          const module = await import('https://esm.sh/web-ifc-viewer@1.0.218');
+          IfcViewerAPI_Class = module.IfcViewerAPI;
+      }
+      const container = document.getElementById('ifcContainer');
+      ifcViewer = new IfcViewerAPI_Class({ container });
+      
+      // Asignamos la ruta al compilado C++ WASM para poder procesar la geometría localmente.
+      await ifcViewer.IFC.setWasmPath("https://cdn.jsdelivr.net/npm/web-ifc@0.0.36/");
+      
+      ifcViewer.grid.setGrid();
+      ifcViewer.axes.setAxes();
+
+      // UX: Iluminar al pasar el ratón (Pre-pick)
+      container.addEventListener('mousemove', () => {
+          if (isIfcMode && ifcViewer) ifcViewer.IFC.selector.prePickIfcItem();
+      });
+
+      // UX: Seleccionar e inspeccionar (Doble clic)
+      container.addEventListener('dblclick', async () => {
+          if (!isIfcMode || !ifcViewer) return;
+          const result = await ifcViewer.IFC.selector.pickIfcItem(true);
+          if (result) {
+              displayIfcProperties(result.modelID, result.id);
+          } else {
+              ifcViewer.IFC.selector.unpickIfcItems();
+              document.getElementById('ifcProps').innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;text-align:center;color:var(--muted);gap:10px"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg><div style="font-size:12px">Haz doble clic en un elemento del modelo 3D<br>para extraer sus mediciones.</div></div>';
+          }
+      });
+  } catch (e) {
+      console.error("Error inicializando el motor BIM:", e);
+      document.getElementById('ifcProps').innerHTML = '<div style="color:#dc2626;padding:12px;background:#fef2f2;border-radius:6px;font-size:12px">❌ Fallo al cargar el motor 3D. Comprueba tu conexión a internet o intenta refrescar.</div>';
+  } finally {
+      loadingOverlay.style.display = 'none';
+  }
+}
+
+async function onFileInputIfc(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  
+  document.getElementById('ifcFname').textContent = file.name;
+  if (!ifcViewer) await initIfcViewer();
+  
+  const loadingOverlay = document.getElementById('ifcLoading');
+  loadingOverlay.querySelector('div').textContent = 'Procesando Geometría BIM...';
+  loadingOverlay.style.display = 'flex';
+  
+  try {
+      const url = URL.createObjectURL(file);
+      await ifcViewer.IFC.loadIfcUrl(url);
+      document.getElementById('ifcProps').innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;text-align:center;color:var(--muted);gap:10px"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg><div style="font-size:12px">Modelo cargado con éxito.<br>Haz doble clic en un elemento para explorar sus propiedades.</div></div>';
+  } catch(err) {
+      console.error(err);
+      alert('Se produjo un error al procesar el archivo IFC.');
+  } finally {
+      loadingOverlay.style.display = 'none';
+      e.target.value = '';
+  }
+}
+
+async function displayIfcProperties(modelID, id) {
+  document.getElementById('ifcProps').innerHTML = '<div style="padding:12px;color:var(--accent);font-weight:600">Extrayendo información del objeto BIM...</div>';
+  
+  try {
+      const props = await ifcViewer.IFC.getProperties(modelID, id, true, false);
+      const psets = await ifcViewer.IFC.loader.ifcManager.getPropertySets(modelID, id, true);
+
+      let html = `<div style="font-weight:800; font-size:13px; color:var(--text); margin-bottom:12px; border-bottom:1px solid var(--border); padding-bottom:8px;">
+          ${esc(props.Name?.value || 'Elemento Geométrico')} <span style="font-size:10px; color:var(--muted); font-weight:600; padding:2px 6px; background:var(--surface); border-radius:10px; margin-left:6px; border:1px solid var(--border)">ID: ${id}</span>
+      </div>`;
+      
+      html += `<div style="display:flex;flex-direction:column;gap:8px;">`;
+      let foundQuants = [];
+      
+      // Función de extracción (Busca en Quantities, LengthValue, VolumeValue, AreaValue...)
+      for(const pset of psets) {
+          if(pset.HasProperties) {
+              for(const p of pset.HasProperties) {
+                  let val = null;
+                  if(p.NominalValue) val = p.NominalValue.value;
+                  else if(p.LengthValue) val = p.LengthValue.value;
+                  else if(p.AreaValue) val = p.AreaValue.value;
+                  else if(p.VolumeValue) val = p.VolumeValue.value;
+                  else if(p.WeightValue) val = p.WeightValue.value;
+
+                  if(typeof val === 'number') foundQuants.push({ name: p.Name?.value || 'Valor numérico', val: val });
+              }
+          }
+          if(pset.Quantities) {
+              for(const q of pset.Quantities) {
+                  let val = null;
+                  if(q.LengthValue) val = q.LengthValue.value;
+                  else if(q.AreaValue) val = q.AreaValue.value;
+                  else if(q.VolumeValue) val = q.VolumeValue.value;
+                  else if(q.WeightValue) val = q.WeightValue.value;
+                  
+                  if(typeof val === 'number') foundQuants.push({ name: q.Name?.value || 'Cantidad', val: val });
+              }
+          }
+      }
+
+      if(foundQuants.length === 0) {
+          html += `<div style="font-size:11.5px; color:var(--muted); padding:10px; background:#f9fafb; border-radius:6px; border:1px dashed #e5e7eb">
+              ⚠️ No se han encontrado propiedades numéricas volumétricas explícitas (Qto) en la definición de este elemento en el IFC.
+          </div>`;
+      } else {
+          html += `<div style="font-size:10.5px; font-weight:700; color:var(--muted); text-transform:uppercase; margin-bottom:4px; letter-spacing:0.5px">Mediciones Geométricas Detectadas</div>`;
+          for(const q of foundQuants) {
+              html += `<div style="background:#fff; border:1px solid var(--border); padding:10px 12px; border-radius:8px; display:flex; justify-content:space-between; align-items:center; box-shadow:0 1px 2px rgba(0,0,0,0.02)">
+                  <div>
+                      <div style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:700;letter-spacing:0.5px;margin-bottom:2px">${esc(q.name)}</div>
+                      <div style="font-size:16px;font-weight:800;color:var(--text)">${fmt(q.val, 4)}</div>
+                  </div>
+                  <button class="btn btn-bim" style="padding:5px 10px; font-size:11.5px" onclick="injectMeasurement(${q.val})">
+                      ↓ Inyectar
+                  </button>
+              </div>`;
+          }
+      }
+      html += `</div>`;
+      document.getElementById('ifcProps').innerHTML = html;
+
+  } catch(err) {
+      console.error(err);
+      document.getElementById('ifcProps').innerHTML = '<div style="color:#dc2626;padding:12px;background:#fef2f2;border-radius:6px;font-size:12px">❌ Error decodificando las propiedades del elemento de la base de datos IFC.</div>';
+  }
+}
+
+function injectMeasurement(val) {
+  const editMed = document.getElementById('en_med');
+  const addMed = document.getElementById('an_rend');
+  
+  if (editMed) {
+      editMed.value = val;
+      editMed.style.backgroundColor = '#bbf7d0';
+      editMed.style.borderColor = '#16a34a';
+      setTimeout(() => { editMed.style.backgroundColor = ''; editMed.style.borderColor = ''; }, 600);
+  } else if (addMed) {
+      addMed.value = val;
+      addMed.style.backgroundColor = '#bbf7d0';
+      addMed.style.borderColor = '#16a34a';
+      setTimeout(() => { addMed.style.backgroundColor = ''; addMed.style.borderColor = ''; }, 600);
+  } else {
+      alert('Abre primero la edición de una partida o el formulario de creación de partida en el panel central para poder inyectar la medición desde el modelo BIM.');
+  }
+}
+</script>
+</body>
+</html>
